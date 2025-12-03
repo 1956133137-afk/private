@@ -16,7 +16,7 @@
         android:clipToPadding="false"
         android:padding="8dp"
         app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-        app:spanCount="4"
+        app:spanCount="8"
         tools:listitem="@layout/item_version" />
 
 </layout>

@@ -1,0 +1,16 @@
+<!-- res/drawable/tab_indicator_dot.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- 定义指示器的尺寸 -->
+    <size
+        android:width="12dp"
+        android:height="4dp" />
+
+    <!-- 定义指示器的颜色 -->
+    <solid android:color="@android:color/black" /> <!-- 颜色会被下面的 tabIndicatorColor 覆盖 -->
+
+    <!-- 定义圆角，让它看起来像个胶囊 -->
+    <corners android:radius="2dp" />
+
+</shape>

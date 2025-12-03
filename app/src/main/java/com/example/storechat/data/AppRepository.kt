@@ -2,11 +2,11 @@ package com.example.storechat.data
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.DownloadStatus
 import com.example.storechat.model.InstallState
-import com.example.storechat.ui.home.AppCategory
-import com.example.storechat.ui.search.UpdateStatus
+import com.example.storechat.model.UpdateStatus
 import com.example.storechat.xc.XcServiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +30,7 @@ object AppRepository {
             delay(800L)
             val current = _appVersion.value?.removePrefix("V") ?: "1.0.0"
             val latestFromServer = "1.0.1"
-            val status = if (latestFromServer == current) UpdateStatus.LATEST else UpdateStatus.NEW_VERSION
+            val status = if (latestFromServer == current) UpdateStatus.LATEST else UpdateStatus.NEW_VERSION(latestFromServer)
             _checkUpdateResult.postValue(status)
         }
     }
@@ -45,6 +45,12 @@ object AppRepository {
     private val _categorizedApps = MutableLiveData<List<AppInfo>>()
     val categorizedApps: LiveData<List<AppInfo>> = _categorizedApps
 
+    private val _downloadQueue = MutableLiveData<List<AppInfo>>(emptyList())
+    val downloadQueue: LiveData<List<AppInfo>> = _downloadQueue
+
+    private val _recentInstalledApps = MutableLiveData<List<AppInfo>>(emptyList())
+    val recentInstalledApps: LiveData<List<AppInfo>> = _recentInstalledApps
+
     init {
         categorizedData = mapOf(
             AppCategory.YANNUO to listOf(
@@ -57,7 +63,7 @@ object AppRepository {
                 AppInfo(
                     name = "应用名称B", description = "应用简介说明...", size = "83MB",
                     downloadCount = 1003, packageName = "com.demo.appb",
-                    apkPath = "/sdcard/apks/app_b.apk", installState = InstallState.INSTALLED_OLD,
+                    apkPath = "/sdcard/apks/app_b.apk", installState = InstallState.INSTALLED_LATEST,
                     versionName = "1.0.1", releaseDate = "2025-10-20"
                 )
             ),
@@ -86,14 +92,27 @@ object AppRepository {
         _categorizedApps.postValue(categorizedData[category] ?: emptyList())
     }
 
-    private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
-        val currentAll = _allApps.value ?: return
-        val newAll = currentAll.map { if (it.packageName == packageName) transform(it) else it }
-        _allApps.postValue(newAll)
+    private fun findApp(packageName: String): AppInfo? {
+        return _allApps.value?.find { it.packageName == packageName } ?:
+               _categorizedApps.value?.find { it.packageName == packageName } ?:
+               _downloadQueue.value?.find { it.packageName == packageName }
+    }
 
-        val currentCategorized = _categorizedApps.value ?: return
-        val newCategorized = currentCategorized.map { if (it.packageName == packageName) transform(it) else it }
-        _categorizedApps.postValue(newCategorized)
+    private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
+        val app = findApp(packageName) ?: return
+        val newApp = transform(app)
+
+        _allApps.value?.let { list ->
+            _allApps.postValue(list.map { if (it.packageName == packageName) newApp else it })
+        }
+
+        _categorizedApps.value?.let { list ->
+            _categorizedApps.postValue(list.map { if (it.packageName == packageName) newApp else it })
+        }
+
+        _downloadQueue.value?.let { list ->
+            _downloadQueue.postValue(list.map { if (it.packageName == packageName) newApp else it })
+        }
     }
 
     fun toggleDownload(app: AppInfo) {
@@ -104,6 +123,11 @@ object AppRepository {
                 updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
             }
             DownloadStatus.NONE, DownloadStatus.PAUSED -> {
+                val currentQueue = _downloadQueue.value ?: emptyList()
+                if (currentQueue.none { it.packageName == app.packageName }) {
+                    _downloadQueue.postValue(currentQueue + app)
+                }
+
                 val newJob = coroutineScope.launch {
                     updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.DOWNLOADING) }
 
@@ -119,18 +143,41 @@ object AppRepository {
                     XcServiceManager.installApk(app.apkPath, app.packageName, true)
                     delay(1500)
 
+                    var installedApp: AppInfo? = null
                     updateAppStatus(app.packageName) {
-                        it.copy(
+                        installedApp = it.copy(
                             downloadStatus = DownloadStatus.NONE,
                             progress = 0,
                             installState = InstallState.INSTALLED_LATEST
                         )
+                        installedApp!!
                     }
                     downloadJobs.remove(app.packageName)
+                    _downloadQueue.value?.let { queue ->
+                        _downloadQueue.postValue(queue.filterNot { it.packageName == app.packageName })
+                    }
+                    installedApp?.let { appInfo ->
+                        val currentRecent = _recentInstalledApps.value ?: emptyList()
+                        _recentInstalledApps.postValue(listOf(appInfo) + currentRecent)
+                    }
                 }
                 downloadJobs[app.packageName] = newJob
             }
             DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {}
+        }
+    }
+
+    fun cancelDownload(app: AppInfo) {
+        downloadJobs[app.packageName]?.cancel()
+        downloadJobs.remove(app.packageName)
+        _downloadQueue.value?.let { list ->
+            _downloadQueue.postValue(list.filterNot { it.packageName == app.packageName })
+        }
+        updateAppStatus(app.packageName) {
+            it.copy(
+                downloadStatus = DownloadStatus.NONE,
+                progress = 0
+            )
         }
     }
 }

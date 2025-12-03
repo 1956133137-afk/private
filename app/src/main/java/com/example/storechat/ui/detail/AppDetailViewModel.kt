@@ -4,29 +4,34 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.switchMap
 import com.example.storechat.data.AppRepository
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.HistoryVersion
 
 class AppDetailViewModel : ViewModel() {
 
-    // 将 appInfo 修改为 MediatorLiveData，以便观察 Repository 的变化
-    private val _appInfo = MediatorLiveData<AppInfo>()
-    val appInfo: LiveData<AppInfo> = _appInfo
+    private val _packageName = MutableLiveData<String>()
+
+    val appInfo: LiveData<AppInfo> = _packageName.switchMap { packageName ->
+        val result = MediatorLiveData<AppInfo>()
+        result.addSource(AppRepository.allApps) { apps ->
+            apps.find { it.packageName == packageName }?.let { foundApp ->
+                if (result.value != foundApp) {
+                    result.value = foundApp
+                }
+            }
+        }
+        result
+    }
 
     // 历史版本列表
     private val _historyVersions = MutableLiveData<List<HistoryVersion>>()
     val historyVersions: LiveData<List<HistoryVersion>> = _historyVersions
 
-    /**
-     * Activity 传入 packageName 后，开始观察 Repository 中对应的 AppInfo
-     */
     fun loadApp(packageName: String) {
-        _appInfo.addSource(AppRepository.allApps) { apps ->
-            val foundApp = apps.find { it.packageName == packageName }
-            if (foundApp != null && _appInfo.value != foundApp) {
-                _appInfo.value = foundApp
-            }
+        if (_packageName.value != packageName) {
+            _packageName.value = packageName
         }
     }
 

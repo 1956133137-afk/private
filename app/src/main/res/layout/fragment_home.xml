@@ -18,8 +18,8 @@
         tools:context=".ui.home.HomeFragment">
 
         <!-- ★ 顶部搜索条 -->
-        <!-- ★ 顶部搜索条 -->
-        <FrameLayout            android:id="@+id/cardSearch"
+        <FrameLayout
+            android:id="@+id/cardSearch"
             android:layout_width="0dp"
             android:layout_height="@dimen/home_search_height"
             android:layout_marginStart="@dimen/common_margin"
@@ -37,8 +37,8 @@
                 <!-- 左侧 Logo -->
                 <ImageView
                     android:id="@+id/ivLogo"
-                    android:layout_width="@dimen/home_icon_size"
-                    android:layout_height="@dimen/home_icon_size"
+                    android:layout_width="23dp"
+                    android:layout_height="23dp"
                     android:src="@drawable/ic_store_logo"
                     android:contentDescription="@null"
                     app:layout_constraintTop_toTopOf="parent"
@@ -48,8 +48,8 @@
                 <!-- 右侧下载管理 -->
                 <ImageView
                     android:id="@+id/ivDownloadManager"
-                    android:layout_width="@dimen/home_icon_size"
-                    android:layout_height="@dimen/home_icon_size"
+                    android:layout_width="23dp"
+                    android:layout_height="23dp"
                     android:src="@drawable/ic_download"
                     android:contentDescription="@null"
                     app:layout_constraintTop_toTopOf="parent"
@@ -82,8 +82,8 @@
             android:layout_height="0dp"
             android:layout_marginStart="@dimen/common_margin"
             android:layout_marginEnd="@dimen/common_margin"
-            android:layout_marginTop="@dimen/home_card_top_margin"
-            android:layout_marginBottom="@dimen/home_card_bottom_margin"
+            android:layout_marginTop="-1dp"
+            android:layout_marginBottom="0dp"
             android:background="@android:color/white"
             app:cardCornerRadius="@dimen/card_corner_radius"
             app:cardUseCompatPadding="true"
@@ -100,22 +100,22 @@
                 <!-- 分类标签栏 -->
                 <com.google.android.material.tabs.TabLayout
                     android:id="@+id/tabLayoutCategories"
-                    android:layout_width="0dp"
-                    android:layout_height="@dimen/home_tab_height"
+                    android:layout_width="match_parent"
+                    android:layout_height="35dp"
                     android:background="@android:color/white"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
                     app:tabGravity="fill"
-                    app:tabMode="fixed"
-                    app:tabIndicatorFullWidth="false"
                     app:tabIndicatorColor="@color/blue_action"
+                    app:tabIndicatorFullWidth="false"
                     app:tabIndicatorHeight="@dimen/home_tab_indicator_height"
-                    app:tabSelectedTextColor="@color/blue_action"
-                    app:tabTextColor="@color/text_secondary"
-                    app:tabRippleColor="@android:color/transparent"
                     app:tabMaxWidth="0dp"
                     app:tabMinWidth="0dp"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent" />
+                    app:tabMode="fixed"
+                    app:tabRippleColor="@android:color/transparent"
+                    app:tabSelectedTextColor="@color/blue_action"
+                    app:tabTextColor="@color/text_secondary" />
 
                 <!-- 应用列表 -->
                 <androidx.recyclerview.widget.RecyclerView

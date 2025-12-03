@@ -51,6 +51,8 @@ class AppListAdapter(
 
             // 右侧按钮点击：执行下载/升级/打开等动作
             binding.btnAction.setOnClickListener { onActionClick(app) }
+            // 下载进度条点击：执行暂停/继续等动作
+            binding.layoutProgress.setOnClickListener { onActionClick(app) }
         }
     }
 }

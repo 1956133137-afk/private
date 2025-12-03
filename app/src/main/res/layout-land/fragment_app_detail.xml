@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+        <import type="android.view.View" />
+        <variable
+            name="viewModel"
+            type="com.example.storechat.ui.detail.AppDetailViewModel" />
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/white"
+        android:padding="16dp">
+
+        <!-- App Icon -->
+        <ImageView
+            android:id="@+id/ivAppIcon"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:src="@drawable/ic_apk_green"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- App Name -->
+        <TextView
+            android:id="@+id/tvAppName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text='@{viewModel.appInfo.name}'
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toEndOf="@id/ivAppIcon"
+            app:layout_constraintTop_toTopOf="@id/ivAppIcon"
+            tools:text="应用名称" />
+
+        <!-- App Source -->
+        <TextView
+            android:id="@+id/tvAppSource"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="应用来源"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            app:layout_constraintStart_toStartOf="@id/tvAppName"
+            app:layout_constraintTop_toBottomOf="@id/tvAppName" />
+
+        <!-- Install Button -->
+        <Button
+            android:id="@+id/btnInstall"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="31dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_btn_action"
+            android:enabled='@{viewModel.appInfo.buttonEnabled}'
+            android:text='@{viewModel.appInfo.buttonText}'
+            android:textColor="@android:color/white"
+            android:textSize="9sp"
+            android:gravity="center"
+            android:minWidth="70dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:visibility="@{viewModel.appInfo.showButton ? View.VISIBLE : View.GONE}"
+            app:layout_constraintStart_toEndOf="@id/ivAppIcon"
+            app:layout_constraintTop_toBottomOf="@id/tvAppSource"
+            tools:text="安装" />
+
+        <!-- Progress Layout -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/layoutProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="31dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_btn_progress"
+            android:visibility="@{viewModel.appInfo.showProgress ? View.VISIBLE : View.GONE}"
+            android:minWidth="70dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            app:layout_constraintStart_toEndOf="@id/ivAppIcon"
+            app:layout_constraintTop_toBottomOf="@id/tvAppSource"
+            tools:visibility="visible">
+
+            <TextView
+                android:id="@+id/tvProgress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text='@{String.valueOf(viewModel.appInfo.progress) + "%"}'
+                android:textColor="#333333"
+                android:textSize="12sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                tools:text="64%" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Divider -->
+        <View
+            android:id="@+id/divider1"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+
+            android:background="@color/divider"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/ivAppIcon" />
+
+        <!-- Stats -->
+        <LinearLayout
+            android:id="@+id/llStats"
+            android:layout_width="250dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/divider1">
+
+            <!-- Downloads -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text='@{String.valueOf(viewModel.appInfo.downloadCount)}'
+                    android:textColor="@color/text_primary"
+                    android:textSize="9sp"
+                    tools:text="1002" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="下载量"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="8sp" />
+            </LinearLayout>
+
+            <!-- Size -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text='@{viewModel.appInfo.size}'
+                    android:textColor="@color/text_primary"
+                    android:textSize="9sp"
+                    tools:text="83MB" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="大小"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="8sp" />
+            </LinearLayout>
+
+            <!-- Version -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text='@{viewModel.appInfo.versionName}'
+                    android:textColor="@color/text_primary"
+                    android:textSize="9sp"
+                    tools:text="1.0.3" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="版本"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="8sp" />
+            </LinearLayout>
+
+            <!-- Update Time -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text='@{viewModel.appInfo.releaseDate}'
+                    android:textColor="@color/text_primary"
+                    android:textSize="9sp"
+                    tools:text="2025-11-12" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="更新时间"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="8sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Divider 2 -->
+        <View
+            android:id="@+id/divider2"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            android:background="@color/divider"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/llStats" />
+
+        <!-- Description -->
+        <TextView
+            android:id="@+id/tvDescriptionTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="应用简介"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/divider2" />
+
+        <TextView
+            android:id="@+id/tvDescription"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:fadeScrollbars="false"
+            android:lineSpacingExtra="4dp"
+            android:scrollbars="vertical"
+            android:text='@{viewModel.appInfo.description}'
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvDescriptionTitle"
+            tools:text="本称重台是一款用于精确测量物体重量的设备..." />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

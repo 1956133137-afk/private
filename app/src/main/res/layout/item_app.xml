@@ -8,6 +8,9 @@
         <variable
             name="app"
             type="com.example.storechat.model.AppInfo" />
+        <variable
+            name="clickListener"
+            type="android.view.View.OnClickListener" />
     </data>
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -47,6 +50,7 @@
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary"
+                android:fontFamily="sans-serif-medium"
                 tools:text="应用名称" />
 
             <TextView
@@ -57,6 +61,7 @@
                 android:text='@{"下 " + app.downloadCount + "   文件大小" + app.size}'
                 android:textSize="11sp"
                 android:textColor="@color/text_secondary"
+                android:fontFamily="sans-serif"
                 tools:text="下 1002   文件大小 83MB" />
 
             <TextView
@@ -69,6 +74,7 @@
                 android:textColor="@color/text_secondary"
                 android:maxLines="1"
                 android:ellipsize="end"
+                android:fontFamily="sans-serif"
                 tools:text="应用简介说明应用简介说明应用简介说明..." />
         </LinearLayout>
 
@@ -77,15 +83,19 @@
             android:id="@+id/btnAction"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:minWidth="72dp"
+            android:minWidth="80dp"
             android:layout_marginEnd="4dp"
             android:text='@{app.buttonText}'
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textAllCaps="false"
             android:gravity="center"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:onClick="@{clickListener}"
             android:background="@drawable/bg_btn_action"
             android:textColor="@color/bt_home"
             android:enabled='@{app.buttonEnabled}'
+            android:visibility="@{app.showProgress ? View.INVISIBLE : View.VISIBLE}"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@id/ivIcon"
             app:layout_constraintBottom_toBottomOf="@id/ivIcon" />
@@ -93,13 +103,15 @@
         <!-- 下载进度块 -->
         <LinearLayout
             android:id="@+id/layoutProgress"
-            android:layout_width="72dp"
+            android:layout_width="0dp"
             android:layout_height="32dp"
             android:layout_marginEnd="4dp"
+            android:onClick="@{clickListener}"
             android:background="@drawable/bg_btn_progress"
             android:gravity="center"
             android:visibility='@{app.showProgress ? View.VISIBLE : View.GONE}'
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="@id/btnAction"
+            app:layout_constraintEnd_toEndOf="@id/btnAction"
             app:layout_constraintTop_toTopOf="@id/ivIcon"
             app:layout_constraintBottom_toBottomOf="@id/ivIcon"
             tools:visibility="gone">
@@ -110,7 +122,7 @@
                 android:layout_height="wrap_content"
                 android:text='@{app.progressText}'
                 android:textSize="13sp"
-                android:textColor="@color/bt_home"
+                android:textColor="@android:color/black"
                 tools:text="16.3%" />
         </LinearLayout>
 

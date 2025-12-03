@@ -9,8 +9,10 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import com.example.storechat.R
 import com.example.storechat.databinding.ActivitySearchBinding
 import com.example.storechat.model.AppInfo
+import com.example.storechat.model.UpdateStatus
 import com.example.storechat.ui.detail.AppDetailActivity
 import com.example.storechat.ui.home.AppListAdapter
 
@@ -33,7 +35,7 @@ class SearchActivity : AppCompatActivity() {
         observeViewModel()
 
         val initialQuery = intent.getStringExtra(EXTRA_QUERY)
-        if (!initialQuery.isNullOrEmpty()) {
+        if (!initialQuery.isNullOrEmpty() && initialQuery != "null") {
             binding.etQuery.setText(initialQuery)
             viewModel.search(initialQuery)
         }
@@ -46,7 +48,7 @@ class SearchActivity : AppCompatActivity() {
         )
         binding.recyclerSearchResult.adapter = adapter
 
-        // 为搜索图标添加点击事件 (移除不必要的空安全调用)
+        // 为搜索图标添加点击事件
         binding.ivSearch.setOnClickListener { performSearch() }
 
         binding.etQuery.setOnEditorActionListener { _, actionId, _ ->
@@ -76,8 +78,8 @@ class SearchActivity : AppCompatActivity() {
 
         viewModel.checkUpdateResult.observe(this) { status ->
             when (status) {
-                UpdateStatus.LATEST -> Toast.makeText(this, "当前已是最新版本", Toast.LENGTH_SHORT).show()
-                UpdateStatus.NEW_VERSION -> showUpdateDialog()
+                is UpdateStatus.LATEST -> Toast.makeText(this, getString(R.string.latest_version_toast), Toast.LENGTH_SHORT).show()
+                is UpdateStatus.NEW_VERSION -> showUpdateDialog(status.latestVersion)
                 null -> {}
             }
             viewModel.clearUpdateResult()
@@ -89,24 +91,23 @@ class SearchActivity : AppCompatActivity() {
                 if (intent != null) {
                     startActivity(intent)
                 } else {
-                    Toast.makeText(this, "无法打开应用", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.cannot_open_app_toast), Toast.LENGTH_SHORT).show()
                 }
                 viewModel.onNavigationComplete()
             }
         }
     }
 
-    private fun showUpdateDialog() {
+    private fun showUpdateDialog(latestVer: String) {
         val currentVer = viewModel.appVersion.value ?: "V1.0.0"
-        val latestVer = "V1.0.1"
 
         AlertDialog.Builder(this)
-            .setTitle("发现新版本")
-            .setMessage("当前版本：$currentVer\n最新版本：$latestVer")
-            .setNegativeButton("稍后") { dialog, _ -> dialog.dismiss() }
-            .setPositiveButton("去更新") { dialog, _ ->
+            .setTitle(getString(R.string.update_dialog_title))
+            .setMessage(getString(R.string.update_dialog_message, currentVer, latestVer))
+            .setNegativeButton(getString(R.string.update_dialog_negative_button)) { dialog, _ -> dialog.dismiss() }
+            .setPositiveButton(getString(R.string.update_dialog_positive_button)) { dialog, _ ->
                 dialog.dismiss()
-                Toast.makeText(this, "这里以后接入应用商店自更新逻辑", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.update_toast_message), Toast.LENGTH_SHORT).show()
             }
             .show()
     }

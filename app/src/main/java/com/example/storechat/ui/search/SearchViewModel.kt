@@ -7,12 +7,7 @@ import androidx.lifecycle.ViewModel
 import com.example.storechat.data.AppRepository
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.InstallState
-
-// 检查更新结果 (移至 Repository)
-enum class UpdateStatus {
-    LATEST,        // 已是最新版本
-    NEW_VERSION    // 有新版本
-}
+import com.example.storechat.model.UpdateStatus
 
 class SearchViewModel : ViewModel() {
 

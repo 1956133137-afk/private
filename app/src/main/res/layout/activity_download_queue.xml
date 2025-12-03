@@ -15,7 +15,7 @@
         android:layout_height="match_parent"
         android:background="@color/store_bg">
 
-        <!-- 1. 顶部 Toolbar -->
+        <!-- 1. Toolbar -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="0dp"
@@ -43,7 +43,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="下载管理"
+                    android:text="下载队列"
                     android:textSize="18sp"
                     android:textColor="@color/text_primary"
                     android:textStyle="bold"
@@ -65,7 +65,7 @@
             </androidx.constraintlayout.widget.ConstraintLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- 2. 主体内容 -->
+        <!-- Main content area -->
         <ScrollView
             android:layout_width="0dp"
             android:layout_height="0dp"
@@ -79,58 +79,38 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- 2.1 正在下载的任务 -->
+                <!-- Downloading Task Section -->
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:id="@+id/layoutHasTask"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:padding="16dp"
-                    android:visibility="@{viewModel.activeTask != null ? View.VISIBLE : View.GONE}"
+                    android:visibility="@{viewModel.activeTask == null ? View.GONE : View.VISIBLE}"
                     tools:visibility="visible">
 
                     <TextView
                         android:id="@+id/tvDownloadingTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text='@{"正在下载(" + (viewModel.activeTask != null ? 1 : 0) + ")"}'
+                        android:text="@{viewModel.downloadingTitleText}"
                         android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold"
                         app:layout_constraintTop_toTopOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
-                        tools:text="正在下载(1)"/>
+                        tools:text="应用名称(1)"/>
 
-                    <LinearLayout
+                    <TextView
+                        android:id="@+id/tvAllResume"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
+                        android:text="全部继续"
+                        android:onClick="@{() -> viewModel.resumeAllPausedTasks()}"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp"
                         app:layout_constraintTop_toTopOf="@id/tvDownloadingTitle"
                         app:layout_constraintBottom_toBottomOf="@id/tvDownloadingTitle"
-                        app:layout_constraintEnd_toEndOf="parent">
-
-                        <TextView
-                            android:id="@+id/tvAllPause"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="全部暂停"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="13sp" />
-
-                        <View
-                            android:layout_width="1dp"
-                            android:layout_height="12dp"
-                            android:layout_gravity="center_vertical"
-                            android:layout_marginHorizontal="8dp"
-                            android:background="@color/divider" />
-
-                        <TextView
-                            android:id="@+id/tvAllResume"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="全部继续"
-                            android:textColor="@color/blue_action"
-                            android:textSize="13sp" />
-                    </LinearLayout>
+                        app:layout_constraintEnd_toEndOf="parent"/>
 
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardDownloading"
@@ -154,86 +134,111 @@
                                 android:layout_height="48dp"
                                 android:src="@drawable/ic_apk_green"
                                 app:layout_constraintStart_toStartOf="parent"
-                                app:layout_constraintTop_toTopOf="parent" />
+                                app:layout_constraintTop_toTopOf="parent"
+                                app:layout_constraintBottom_toBottomOf="parent"/>
 
                             <TextView
                                 android:id="@+id/tvAppName"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="12dp"
-                                android:text="@{viewModel.activeTask.app.name}"
+                                android:layout_marginEnd="8dp"
+                                android:text="@{viewModel.appName + ` (` + viewModel.progressText + `)`}"
                                 android:textColor="@color/text_primary"
                                 android:textSize="15sp"
+                                android:maxLines="1"
+                                android:ellipsize="end"
                                 app:layout_constraintStart_toEndOf="@id/ivAppIcon"
                                 app:layout_constraintTop_toTopOf="@id/ivAppIcon"
-                                app:layout_constraintEnd_toStartOf="@+id/tvStatus"
-                                tools:text="应用名称" />
+                                app:layout_constraintEnd_toStartOf="@id/tvStatus"
+                                tools:text="应用名称 (16.3%)" />
+
+                            <TextView
+                                android:id="@+id/tvSpeed"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@{viewModel.speedText}"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="11sp"
+                                app:layout_constraintTop_toBottomOf="@id/tvAppName"
+                                app:layout_constraintStart_toStartOf="@id/tvAppName"
+                                tools:text="1.8 MB/s" />
 
                             <ProgressBar
                                 android:id="@+id/progressBar"
                                 style="?android:attr/progressBarStyleHorizontal"
                                 android:layout_width="0dp"
                                 android:layout_height="4dp"
-                                android:layout_marginTop="8dp"
-                                android:progress="@{viewModel.activeTask.progress}"
+                                android:layout_marginTop="4dp"
+                                android:layout_marginEnd="8dp"
+                                android:progress="@{viewModel.progressValue}"
                                 android:progressDrawable="@drawable/bg_btn_progress_bar"
-                                app:layout_constraintTop_toBottomOf="@id/tvAppName"
+                                app:layout_constraintTop_toBottomOf="@id/tvSpeed"
                                 app:layout_constraintStart_toStartOf="@id/tvAppName"
-                                app:layout_constraintEnd_toEndOf="@id/tvAppName" />
+                                app:layout_constraintEnd_toStartOf="@id/tvSizeInfo"
+                                app:layout_constraintBottom_toBottomOf="@id/ivAppIcon"/>
 
                             <TextView
                                 android:id="@+id/tvSizeInfo"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text='@{"${viewModel.activeTask.downloadedSize}/${viewModel.activeTask.totalSize}"}'
+                                android:text="@{viewModel.sizeInfoText}"
                                 android:textColor="@color/text_secondary"
                                 android:textSize="11sp"
-                                app:layout_constraintTop_toBottomOf="@id/progressBar"
-                                app:layout_constraintStart_toStartOf="@id/progressBar"
-                                tools:text="1.8MB/83.0MB" />
+                                app:layout_constraintTop_toTopOf="@id/progressBar"
+                                app:layout_constraintBottom_toBottomOf="@id/progressBar"
+                                app:layout_constraintStart_toEndOf="@id/progressBar"
+                                app:layout_constraintEnd_toStartOf="@id/ivCancel"
+                                tools:text="1.8MB/83.00MB" />
 
-                            <TextView
-                                android:id="@+id/tvSpeed"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{viewModel.activeTask.speed}"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="11sp"
-                                app:layout_constraintTop_toTopOf="@id/tvSizeInfo"
-                                app:layout_constraintEnd_toEndOf="@id/progressBar"
-                                tools:text="1.3 MB/s" />
+                            <ImageView
+                                android:id="@+id/ivCancel"
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_marginStart="8dp"
+                                android:onClick="@{() -> viewModel.cancelDownload()}"
+                                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                                app:layout_constraintTop_toTopOf="@id/progressBar"
+                                app:layout_constraintBottom_toBottomOf="@id/progressBar"
+                                app:layout_constraintStart_toEndOf="@id/tvSizeInfo"
+                                app:layout_constraintEnd_toStartOf="@id/tvStatus"/>
 
                             <TextView
                                 android:id="@+id/tvStatus"
                                 android:layout_width="64dp"
                                 android:layout_height="30dp"
-                                android:background="@drawable/bg_btn_action"
+                                android:layout_marginStart="8dp"
+                                android:background="@drawable/bg_btn_progress"
                                 android:gravity="center"
-                                android:text="@{viewModel.activeTask.rightText}"
+                                android:onClick="@{() -> viewModel.onStatusClick()}"
+                                android:text="@{viewModel.progressText}"
                                 android:textColor="@color/blue_action"
                                 android:textSize="12sp"
                                 app:layout_constraintEnd_toEndOf="parent"
                                 app:layout_constraintTop_toTopOf="parent"
                                 app:layout_constraintBottom_toBottomOf="parent"
-                                tools:text="暂停" />
+                                tools:text="16.3%" />
 
                         </androidx.constraintlayout.widget.ConstraintLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
-                <!-- 2.2 最近安装完成 -->
+                <!-- Recently Installed Section -->
                 <LinearLayout
                     android:id="@+id/layoutRecent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingBottom="16dp">
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="16dp"
+                    android:visibility="@{viewModel.recentInstalled.empty ? View.GONE : View.VISIBLE}"
+                    tools:visibility="visible">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
                         android:text="最近安装完成"
                         android:textColor="@color/text_primary"
                         android:textSize="15sp"
@@ -250,7 +255,7 @@
 
                 </LinearLayout>
 
-                <!-- 2.3 空页面 -->
+                <!-- Empty State Section -->
                 <LinearLayout
                     android:id="@+id/layoutEmpty"
                     android:layout_width="match_parent"
@@ -259,7 +264,7 @@
                     android:gravity="center"
                     android:paddingTop="80dp"
                     android:visibility="@{viewModel.activeTask == null ? View.VISIBLE : View.GONE}"
-                    tools:visibility="visible">
+                    tools:visibility="gone">
 
                     <ImageView
                         android:layout_width="180dp"

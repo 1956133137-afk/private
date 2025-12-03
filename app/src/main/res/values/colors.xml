@@ -8,7 +8,6 @@
     <color name="store_bg">#F5F6FA</color>
     <color name="text_primary">#222222</color>
     <color name="text_secondary">#999999</color>
-    <color name="text_tertiary">#999999</color>  <!-- 新增的三级文本颜色 -->
     <color name="divider">#E0E0E0</color>
     <color name="blue_action">#2F7BFF</color>
     <color name="bt_home">#999998</color>

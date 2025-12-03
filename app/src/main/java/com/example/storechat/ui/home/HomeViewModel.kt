@@ -1,20 +1,13 @@
 package com.example.storechat.ui.home
 
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.example.storechat.data.AppRepository
+import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.InstallState
-import com.example.storechat.ui.search.UpdateStatus
-
-// 首页 Tab 枚举
-enum class AppCategory(val title: String) {
-    YANNUO("彦诺自研"),
-    ICBC("工行系列"),
-    CCB("建行系列")
-}
+import com.example.storechat.model.UpdateStatus
 
 class HomeViewModel : ViewModel() {
 

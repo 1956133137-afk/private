@@ -1,6 +1,7 @@
 package com.example.storechat.ui.home
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,12 +11,14 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import com.example.storechat.MainActivity
 import com.example.storechat.databinding.FragmentHomeBinding
+import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
+import com.example.storechat.model.UpdateStatus
 import com.example.storechat.ui.detail.AppDetailActivity
 import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
-import com.example.storechat.ui.search.UpdateStatus
 import com.google.android.material.tabs.TabLayout
 
 class HomeFragment : Fragment() {
@@ -52,36 +55,27 @@ class HomeFragment : Fragment() {
         binding.recyclerAppList.adapter = appListAdapter
 
         binding.tabLayoutCategories.apply {
-            addTab(newTab().setText(AppCategory.YANNUO.title))
-            addTab(newTab().setText(AppCategory.ICBC.title))
-            addTab(newTab().setText(AppCategory.CCB.title))
+            AppCategory.values().forEach { category ->
+                addTab(newTab().setText(category.title))
+            }
 
             // 强制标签左对齐
             tabGravity = TabLayout.GRAVITY_FILL
             tabMode = TabLayout.MODE_SCROLLABLE
-
         }
 
         binding.tabLayoutCategories.addOnTabSelectedListener(object :
             TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
-                val category = when (tab.position) {
-                    0 -> AppCategory.YANNUO
-                    1 -> AppCategory.ICBC
-                    2 -> AppCategory.CCB
-                    else -> AppCategory.YANNUO
-                }
+                val category = AppCategory.values()[tab.position]
                 viewModel.selectCategory(category)
             }
             override fun onTabUnselected(tab: TabLayout.Tab) {}
             override fun onTabReselected(tab: TabLayout.Tab) {}
         })
 
-        // 将点击事件精确绑定到 ivSearch 图标上 (使用安全调用)
-        binding.ivSearch?.setOnClickListener { SearchActivity.start(requireContext()) }
-
         // 为横屏的真实搜索框和按钮设置点击事件
-        binding.btnSearch?.setOnClickListener { performSearch() }
+        binding.ivSearch?.setOnClickListener { performSearch() }
         binding.etSearch?.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 performSearch()
@@ -91,12 +85,18 @@ class HomeFragment : Fragment() {
             }
         }
 
-        binding.ivDownloadManager?.setOnClickListener { DownloadQueueActivity.start(requireContext()) }
+        binding.ivDownloadManager?.setOnClickListener {
+            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                (activity as? MainActivity)?.openDrawer()
+            } else {
+                startActivity(Intent(requireContext(), DownloadQueueActivity::class.java))
+            }
+        }
         binding.tvVersion?.setOnClickListener { viewModel.checkAppUpdate() }
     }
 
     private fun performSearch() {
-        val keyword = binding.etSearch?.text.toString()
+        val keyword = binding.etSearch?.text.toString() ?: ""
         SearchActivity.start(requireContext(), keyword)
     }
 
@@ -107,8 +107,8 @@ class HomeFragment : Fragment() {
 
         viewModel.checkUpdateResult.observe(viewLifecycleOwner) { status ->
             when (status) {
-                UpdateStatus.LATEST -> Toast.makeText(requireContext(), "当前已是最新版本", Toast.LENGTH_SHORT).show()
-                UpdateStatus.NEW_VERSION -> showUpdateDialog()
+                is UpdateStatus.LATEST -> Toast.makeText(requireContext(), "当前已是最新版本", Toast.LENGTH_SHORT).show()
+                is UpdateStatus.NEW_VERSION -> showUpdateDialog(status.latestVersion)
                 null -> {}
             }
             viewModel.clearUpdateResult()
@@ -127,9 +127,8 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun showUpdateDialog() {
+    private fun showUpdateDialog(latestVer: String) {
         val currentVer = viewModel.appVersion.value ?: "V1.0.0"
-        val latestVer = "V1.0.1"
 
         AlertDialog.Builder(requireContext())
             .setTitle("发现新版本")

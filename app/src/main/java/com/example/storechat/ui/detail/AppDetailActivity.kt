@@ -2,7 +2,12 @@ package com.example.storechat.ui.detail
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
@@ -41,17 +46,20 @@ class AppDetailActivity : AppCompatActivity() {
         // Toolbar
         binding.ivBack.setOnClickListener { finish() }
         binding.ivSearch.setOnClickListener { SearchActivity.start(this) }
-        binding.ivDownload.setOnClickListener { DownloadQueueActivity.start(this) }
+        binding.ivDownload.setOnClickListener {
+            startActivity(Intent(this, DownloadQueueActivity::class.java))
+        }
 
-        // 为“安装”按钮和“进度条”布局都设置相同的点击事件
-        val clickListener: (view: android.view.View) -> Unit = {
+        val clickListener: (view: View) -> Unit = {
             viewModel.appInfo.value?.let { currentAppInfo ->
                 AppRepository.toggleDownload(currentAppInfo)
             }
         }
 
-        binding.btnInstall.setOnClickListener(clickListener)
-        binding.layoutProgress.setOnClickListener(clickListener)
+        if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+            binding.btnInstall?.setOnClickListener(clickListener)
+            binding.layoutProgress?.setOnClickListener(clickListener)
+        }
     }
 
     private fun setupViewPagerAndTabs() {
@@ -65,11 +73,18 @@ class AppDetailActivity : AppCompatActivity() {
             }
         }.attach()
 
-        //让Tab根据文字内容自适应宽度
-//        binding.tabLayout.tabGravity = com.google.android.material.tabs.TabLayout.GRAVITY_FILL
-        binding.tabLayout.tabMode = com.google.android.material.tabs.TabLayout.MODE_AUTO
-
-
+        // 遍历所有 Tab, 将文字左对齐
+        for (i in 0 until binding.tabLayout.tabCount) {
+            val tabView = (binding.tabLayout.getChildAt(0) as ViewGroup).getChildAt(i)
+            if (tabView is ViewGroup) {
+                for (j in 0 until tabView.childCount) {
+                    val child = tabView.getChildAt(j)
+                    if (child is TextView) {
+                        child.gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                    }
+                }
+            }
+        }
     }
 
     companion object {
