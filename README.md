@@ -30,6 +30,7 @@ The app uses the `AndroidAutoSize` library for screen adaptation.
 *   `.ui.detail.AppDetailActivity`: This activity likely displays the details of a specific application.
 *   `.ui.search.SearchActivity`: This activity provides search functionality.
 *   `.ui.download.DownloadQueueActivity`: This activity is likely used to display and manage a queue of downloads.
+<<<<<<< HEAD
 
 1. 顶层目录结构（逻辑层级）
    app/src/main/java/com/example/storechat/
@@ -235,3 +236,5 @@ Repository + ViewModel 分层清晰
 静默安装服务集成（xc/MyService）
 
 完整界面布局与适配支持
+=======
+>>>>>>> origin/main
