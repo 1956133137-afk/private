@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 
 object AppRepository {
 
+
+    //3个接口
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val downloadJobs = mutableMapOf<String, Job>()
 
@@ -45,6 +47,7 @@ object AppRepository {
     private val _categorizedApps = MutableLiveData<List<AppInfo>>()
     val categorizedApps: LiveData<List<AppInfo>> = _categorizedApps
 
+    //下载接口
     private val _downloadQueue = MutableLiveData<List<AppInfo>>(emptyList())
     val downloadQueue: LiveData<List<AppInfo>> = _downloadQueue
 
@@ -115,6 +118,8 @@ object AppRepository {
         }
     }
 
+
+    //下载接口连接
     fun toggleDownload(app: AppInfo) {
         when (app.downloadStatus) {
             DownloadStatus.DOWNLOADING -> {
