@@ -9,7 +9,8 @@ import com.example.storechat.databinding.ItemDownloadTaskBinding
 import com.example.storechat.model.DownloadTask
 
 class DownloadListAdapter(
-    private val onActionClick: (DownloadTask) -> Unit
+    private val onStatusClick: (DownloadTask) -> Unit,
+    private val onCancelClick: (DownloadTask) -> Unit
 ) : ListAdapter<DownloadTask, DownloadListAdapter.DownloadViewHolder>(DiffCallback) {
 
     companion object DiffCallback : DiffUtil.ItemCallback<DownloadTask>() {
@@ -42,8 +43,13 @@ class DownloadListAdapter(
         private var currentTask: DownloadTask? = null
 
         init {
-            binding.root.setOnClickListener {
-                currentTask?.let { onActionClick(it) }
+            // ✅ 只通过按钮控制，不再点整行
+            binding.tvStatus.setOnClickListener {
+                currentTask?.let { onStatusClick(it) }
+            }
+            // ✅ 这里是关闭 / 取消下载的小叉号（item_download_task.xml 里的 ivCancel）
+            binding.ivCancel.setOnClickListener {
+                currentTask?.let { onCancelClick(it) }
             }
         }
 

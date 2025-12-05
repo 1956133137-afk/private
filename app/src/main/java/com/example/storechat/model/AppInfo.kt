@@ -78,7 +78,10 @@ data class AppInfo(
      */
     val showProgress: Boolean
         get() = when(downloadStatus) {
-            DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED, DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> true
+            DownloadStatus.DOWNLOADING,
+            DownloadStatus.PAUSED,
+            DownloadStatus.VERIFYING,
+            DownloadStatus.INSTALLING -> true
             DownloadStatus.NONE -> false
         }
 

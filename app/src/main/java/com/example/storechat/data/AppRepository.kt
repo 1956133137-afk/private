@@ -79,6 +79,16 @@ object AppRepository {
                 versionName = "1.0.3", releaseDate = "2025-11-12", category = AppCategory.YANNUO
             ),
             AppInfo(
+                name = "应用名称C", description = "应用简介说明...", size = "83MB",
+                downloadCount = 1002, packageName = "com.demo.appc",
+                apkPath = "/sdcard/apks/app_a_103.apk",
+                // 假设当前机器上其实是 1.0.2，这里标记为已安装旧版本，按钮就会显示“升级”
+                installState = InstallState.INSTALLED_OLD,
+                versionName = "1.0.4",   // 新版本号
+                releaseDate = "2025-11-12",
+                category = AppCategory.YANNUO
+            ),
+            AppInfo(
                 name = "应用名称B", description = "应用简介说明...", size = "83MB",
                 downloadCount = 1003, packageName = "com.demo.appb",
                 apkPath = "/sdcard/apks/app_b.apk", installState = InstallState.INSTALLED_LATEST,
@@ -90,6 +100,7 @@ object AppRepository {
                 apkPath = "/sdcard/apks/icbc_mobilebank.apk", installState = InstallState.NOT_INSTALLED,
                 versionName = "8.2.0.1.1", releaseDate = "2025-11-05", category = AppCategory.ICBC
             ),
+
             AppInfo(
                 name = "建行生活", description = "吃喝玩乐建行优惠", size = "70MB",
                 downloadCount = 300000, packageName = "com.ccb.life",
@@ -184,13 +195,20 @@ object AppRepository {
 
 
     //    下载队列 & 安装逻辑
+
+    //    下载队列 & 安装逻辑
     fun toggleDownload(app: AppInfo) {
         when (app.downloadStatus) {
+            // 1. 正在下载 -> 点击变为暂停
             DownloadStatus.DOWNLOADING -> {
                 downloadJobs[app.packageName]?.cancel()
                 downloadJobs.remove(app.packageName)
-                updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
+                updateAppStatus(app.packageName) {
+                    it.copy(downloadStatus = DownloadStatus.PAUSED)
+                }
             }
+
+            // 2. 未在下载 / 已暂停 -> 开始（或继续）下载：包括“安装”和“升级”
             DownloadStatus.NONE, DownloadStatus.PAUSED -> {
                 val currentQueue = _downloadQueue.value ?: emptyList()
                 if (currentQueue.none { it.packageName == app.packageName }) {
@@ -198,26 +216,39 @@ object AppRepository {
                 }
 
                 val newJob = coroutineScope.launch {
-//                   先解析出真正要用的 apk 下载地址（接口 or 本地路径）
+                    // 先解析出真正要用的 apk 下载地址（接口 or 本地路径）
                     val realApkPath = resolveDownloadApkPath(
                         packageName = app.packageName,
                         fallbackApkPath = app.apkPath,
-                        versionName = app.versionName
+                        versionName = app.versionName   // 这里带上版本号，后端即可区分是升级哪一版
                     )
-                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.DOWNLOADING) }
 
+                    // 标记为下载中
+                    updateAppStatus(app.packageName) {
+                        it.copy(downloadStatus = DownloadStatus.DOWNLOADING)
+                    }
+
+                    // 模拟下载进度
                     for (p in app.progress..100) {
                         delay(80L)
                         updateAppStatus(app.packageName) { it.copy(progress = p) }
                     }
 
-                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.VERIFYING) }
+                    // 验证
+                    updateAppStatus(app.packageName) {
+                        it.copy(downloadStatus = DownloadStatus.VERIFYING)
+                    }
                     delay(500)
 
-                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.INSTALLING) }
-                    XcServiceManager.installApk(app.apkPath, app.packageName, true)
+                    // 安装
+                    updateAppStatus(app.packageName) {
+                        it.copy(downloadStatus = DownloadStatus.INSTALLING)
+                    }
+                    // ★ 这里用 realApkPath，确保升级时是装“新包”
+                    XcServiceManager.installApk(realApkPath, app.packageName, true)
                     delay(1500)
 
+                    // 安装完成 -> 变为“已最新”，并从下载队列移除，加入“最近安装”
                     var installedApp: AppInfo? = null
                     updateAppStatus(app.packageName) {
                         installedApp = it.copy(
@@ -227,22 +258,91 @@ object AppRepository {
                         )
                         installedApp!!
                     }
+
                     downloadJobs.remove(app.packageName)
                     _downloadQueue.value?.let { queue ->
                         _downloadQueue.postValue(queue.filterNot { it.packageName == app.packageName })
                     }
+
                     installedApp?.let { appInfo ->
                         val currentRecent = _recentInstalledApps.value ?: emptyList()
                         _recentInstalledApps.postValue(listOf(appInfo) + currentRecent)
                     }
                 }
+
                 downloadJobs[app.packageName] = newJob
             }
+
+            // 3. 验证/安装阶段点击无效
             DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {
-                //忽略
+                // 忽略点击
             }
         }
     }
+
+
+
+
+
+//    fun toggleDownload(app: AppInfo) {
+//        when (app.downloadStatus) {
+//            DownloadStatus.DOWNLOADING -> {
+//                downloadJobs[app.packageName]?.cancel()
+//                downloadJobs.remove(app.packageName)
+//                updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
+//            }
+//            DownloadStatus.NONE, DownloadStatus.PAUSED -> {
+//                val currentQueue = _downloadQueue.value ?: emptyList()
+//                if (currentQueue.none { it.packageName == app.packageName }) {
+//                    _downloadQueue.postValue(currentQueue + app)
+//                }
+//
+//                val newJob = coroutineScope.launch {
+////                   先解析出真正要用的 apk 下载地址（接口 or 本地路径）
+//                    val realApkPath = resolveDownloadApkPath(
+//                        packageName = app.packageName,
+//                        fallbackApkPath = app.apkPath,
+//                        versionName = app.versionName
+//                    )
+//                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.DOWNLOADING) }
+//
+//                    for (p in app.progress..100) {
+//                        delay(80L)
+//                        updateAppStatus(app.packageName) { it.copy(progress = p) }
+//                    }
+//
+//                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.VERIFYING) }
+//                    delay(500)
+//
+//                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.INSTALLING) }
+//                    XcServiceManager.installApk(app.apkPath, app.packageName, true)
+//                    delay(1500)
+//
+//                    var installedApp: AppInfo? = null
+//                    updateAppStatus(app.packageName) {
+//                        installedApp = it.copy(
+//                            downloadStatus = DownloadStatus.NONE,
+//                            progress = 0,
+//                            installState = InstallState.INSTALLED_LATEST
+//                        )
+//                        installedApp!!
+//                    }
+//                    downloadJobs.remove(app.packageName)
+//                    _downloadQueue.value?.let { queue ->
+//                        _downloadQueue.postValue(queue.filterNot { it.packageName == app.packageName })
+//                    }
+//                    installedApp?.let { appInfo ->
+//                        val currentRecent = _recentInstalledApps.value ?: emptyList()
+//                        _recentInstalledApps.postValue(listOf(appInfo) + currentRecent)
+//                    }
+//                }
+//                downloadJobs[app.packageName] = newJob
+//            }
+//            DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {
+//                //忽略
+//            }
+//        }
+//    }
 
     fun cancelDownload(app: AppInfo) {
         downloadJobs[app.packageName]?.cancel()
@@ -289,6 +389,7 @@ object AppRepository {
         return listOf(
             HistoryVersion("1.0.2", "/sdcard/apks/${app.packageName}_102.apk"),
             HistoryVersion("1.0.1", "/sdcard/apks/${app.packageName}_101.apk"),
+
             HistoryVersion("1.0.0", "/sdcard/apks/${app.packageName}_100.apk")
         )
     }

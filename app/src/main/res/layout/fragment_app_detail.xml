@@ -83,7 +83,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text='@{String.valueOf(viewModel.appInfo.downloadCount)}'
-                        android:textColor="@color/text_primary"
+                        android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         tools:text="1002" />
@@ -109,7 +109,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text='@{viewModel.appInfo.size}'
-                        android:textColor="@color/text_primary"
+                        android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         tools:text="83MB" />
@@ -135,7 +135,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text='@{viewModel.appInfo.versionName}' 
-                        android:textColor="@color/text_primary"
+                        android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         tools:text="1.0.3" />
@@ -161,7 +161,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text='@{viewModel.appInfo.releaseDate}'
-                        android:textColor="@color/text_primary"
+                        android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         tools:text="2025-11-12" />

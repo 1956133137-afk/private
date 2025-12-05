@@ -114,7 +114,7 @@
                     app:tabMinWidth="0dp"
                     app:tabMode="fixed"
                     app:tabRippleColor="@android:color/transparent"
-                    app:tabSelectedTextColor="@color/blue_action"
+                    app:tabSelectedTextColor="@color/black"
                     app:tabTextColor="@color/text_secondary" />
 
                 <!-- 应用列表 -->

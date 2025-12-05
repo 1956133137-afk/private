@@ -1,281 +1,297 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 下载队列Fragment的布局文件 -->
+<!-- 横屏：右侧下载列表“小卡片”布局 -->
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 数据绑定部分 -->
     <data>
         <!-- 导入View类，用于控制视图可见性 -->
         <import type="android.view.View" />
-        <!-- 定义ViewModel变量，用于数据绑定 -->
+
+        <!-- ViewModel -->
         <variable
             name="viewModel"
             type="com.example.storechat.ui.download.DownloadQueueViewModel" />
+
+<!--        多任务下载列表的适配器，使用 DownloadListAdapter-->
         <variable
             name="downloadAdapter"
-            type="com.example.storechat.ui.home.DownloadListAdapter" />
+            type="com.example.storechat.ui.home.DownloadListAdapter"
+            />
     </data>
 
-    <!-- 外层只负责留出右上角位置 + 阴影边距 -->
-<!--    <FrameLayout-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="match_parent"-->
-<!--        android:padding="16dp"-->
-<!--        android:background="@android:color/transparent"-->
-<!--        android:gravity="top|end">-->
-<!--&lt;!&ndash;        真正的弹窗卡片&ndash;&gt;-->
-<!--    <androidx.cardview.widget.CardView-->
-<!--        android:layout_width="320dp"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        app:cardCornerRadius="8dp"-->
-<!--        app:cardElevation="6dp"-->
-<!--        android:layout_gravity="top|end"-->
-<!--        >-->
-
-<!--        <LinearLayout-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:orientation="vertical"-->
-<!--            android:background="@android:color/white">-->
-
-
-<!--&lt;!&ndash;            顶部标题栏：下载列表 + 关闭按钮&ndash;&gt;-->
-<!--            <androidx.constraintlayout.widget.ConstraintLayout-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:padding="16dp">-->
-<!--                <TextView-->
-<!--                    android:layout_width="wrap_content"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:text="下载列表"-->
-<!--                    android:textColor="@color/text_primary"-->
-<!--                    android:textSize="16sp"-->
-<!--                    android:textStyle="bold"-->
-<!--                    app:layout_constraintStart_toStartOf="parent"-->
-<!--                    app:layout_constraintTop_toTopOf="parent"-->
-<!--                    app:layout_constraintBottom_toBottomOf="parent" />-->
-
-<!--                <TextView-->
-<!--                    android:layout_width="wrap_content"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:text="下载列表"-->
-<!--                    android:textColor="@color/text_primary"-->
-<!--                    android:textSize="16sp"-->
-<!--                    android:textStyle="bold"-->
-<!--                    app:layout_constraintStart_toStartOf="parent"-->
-<!--                    app:layout_constraintTop_toTopOf="parent"-->
-<!--                    app:layout_constraintBottom_toBottomOf="parent" />-->
-<!--            </androidx.constraintlayout.widget.ConstraintLayout>-->
-
-<!--            <androidx.constraintlayout.widget.ConstraintLayout-->
-<!--                android:id="@+id/layoutHasTask"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:padding="16dp"-->
-<!--                android:visibility="@{viewModel.activeTask != null ? View.VISIBLE : View.GONE}"-->
-<!--                tools:visibility="visible">-->
-
-<!--    &lt;!&ndash; 应用图标 &ndash;&gt;-->
-<!--            <ImageView-->
-<!--                android:id="@+id/ivAppIcon"-->
-<!--                android:layout_width="40dp"-->
-<!--                android:layout_height="40dp"-->
-<!--                android:src="@drawable/ic_apk_green"-->
-<!--                android:contentDescription="@null"-->
-<!--                app:layout_constraintStart_toStartOf="parent"-->
-<!--                app:layout_constraintTop_toTopOf="parent" />-->
-
-<!--            &lt;!&ndash; 应用名称 &ndash;&gt;-->
-<!--            <TextView-->
-<!--                android:id="@+id/tvAppName"-->
-<!--                android:layout_width="0dp"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:layout_marginStart="12dp"-->
-<!--                android:text='@{viewModel.activeTask.app.name}'-->
-<!--                android:textColor="@color/text_primary"-->
-<!--                android:textSize="14sp"-->
-<!--                app:layout_constraintStart_toEndOf="@id/ivAppIcon"-->
-<!--                app:layout_constraintTop_toTopOf="@id/ivAppIcon"-->
-<!--                app:layout_constraintEnd_toStartOf="@id/tvStatus"-->
-<!--                tools:text="应用名称" />-->
-<!--                &lt;!&ndash; 下载速度 &ndash;&gt;-->
-<!--                <TextView-->
-<!--                    android:id="@+id/tvSpeed"-->
-<!--                    android:layout_width="wrap_content"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:layout_marginTop="4dp"-->
-<!--                    android:text='@{viewModel.activeTask.speed}'-->
-<!--                    android:textColor="@color/text_secondary"-->
-<!--                    android:textSize="11sp"-->
-<!--                    app:layout_constraintStart_toStartOf="@id/tvAppName"-->
-<!--                    app:layout_constraintTop_toBottomOf="@id/tvAppName"-->
-<!--                    tools:text="1.2MB/s" />-->
-
-<!--                &lt;!&ndash; 进度条 &ndash;&gt;-->
-<!--                <ProgressBar-->
-<!--                    android:id="@+id/progressBar"-->
-<!--                    style="?android:attr/progressBarStyleHorizontal"-->
-<!--                    android:layout_width="0dp"-->
-<!--                    android:layout_height="4dp"-->
-<!--                    android:layout_marginTop="6dp"-->
-<!--                    android:progress='@{viewModel.activeTask.progress}'-->
-<!--                    android:progressDrawable="@drawable/bg_btn_progress_bar"-->
-<!--                    app:layout_constraintTop_toBottomOf="@id/tvSpeed"-->
-<!--                    app:layout_constraintStart_toStartOf="@id/tvSpeed"-->
-<!--                    app:layout_constraintEnd_toStartOf="@+id/tvSizeInfo" />-->
-
-<!--                &lt;!&ndash; 大小信息 &ndash;&gt;-->
-<!--                <TextView-->
-<!--                    android:id="@+id/tvSizeInfo"-->
-<!--                    android:layout_width="wrap_content"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:layout_marginStart="8dp"-->
-<!--                    android:text='@{viewModel.activeTask.downloadedSize + "/" + viewModel.activeTask.totalSize}'-->
-<!--                    android:textColor="@color/text_secondary"-->
-<!--                    android:textSize="11sp"-->
-<!--                    app:layout_constraintStart_toEndOf="@id/progressBar"-->
-<!--                    app:layout_constraintTop_toTopOf="@id/progressBar"-->
-<!--                    app:layout_constraintBottom_toBottomOf="@id/progressBar"-->
-<!--                    app:layout_constraintEnd_toStartOf="@+id/ivCancelDownload"-->
-<!--                    tools:text="1.9MB/11.2MB" />-->
-
-<!--                &lt;!&ndash; 取消按钮 &ndash;&gt;-->
-<!--                <ImageView-->
-<!--                    android:id="@+id/ivCancelDownload"-->
-<!--                    android:layout_width="16dp"-->
-<!--                    android:layout_height="16dp"-->
-<!--                    android:layout_marginStart="8dp"-->
-<!--                    android:src="@drawable/ic_close"-->
-<!--                    android:contentDescription="@null"-->
-<!--                    app:layout_constraintStart_toEndOf="@id/tvSizeInfo"-->
-<!--                    app:layout_constraintTop_toTopOf="@id/progressBar"-->
-<!--                    app:layout_constraintBottom_toBottomOf="@id/progressBar" />-->
-
-<!--                &lt;!&ndash; 状态按钮（显示百分比） &ndash;&gt;-->
-<!--                <TextView-->
-<!--                    android:id="@+id/tvStatus"-->
-<!--                    android:layout_width="wrap_content"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:paddingHorizontal="10dp"-->
-<!--                    android:paddingVertical="6dp"-->
-<!--                    android:background="@drawable/bg_btn_progress"-->
-<!--                    android:text='@{String.format("%.1f%%", (float)viewModel.activeTask.progress)}'-->
-<!--                    android:textColor="@color/blue_action"-->
-<!--                    android:textSize="12sp"-->
-<!--                    android:gravity="center"-->
-<!--                    app:layout_constraintEnd_toEndOf="parent"-->
-<!--                    app:layout_constraintTop_toTopOf="parent"-->
-<!--                    app:layout_constraintBottom_toBottomOf="parent"-->
-<!--                    tools:text="16.3%" />-->
-<!--            </androidx.constraintlayout.widget.ConstraintLayout>-->
-
-<!--            &lt;!&ndash; 3. “查看更多” 按钮（靠右） &ndash;&gt;-->
-<!--            <TextView-->
-<!--                android:id="@+id/tvSeeMore"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:padding="12dp"-->
-<!--                android:text="查看更多"-->
-<!--                android:textColor="@color/blue_action"-->
-<!--                android:textSize="12sp"-->
-<!--                android:gravity="end" />-->
-
-<!--        </LinearLayout>-->
-<!--    </androidx.cardview.widget.CardView>-->
-<!--    </FrameLayout>-->
-
-
-
-
-
-
-
-
-
-
-
-
-<!--</layout>-->
-
-
-<!--     根布局，使用LinearLayout垂直排列 -->
-    <LinearLayout
+    <!-- 根布局：铺满 Drawer 区域，本身透明，只承载一张卡片 -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:background="@color/store_bg">
+        android:background="@android:color/transparent">
 
-        <!-- 1. 顶部工具栏 -->
-        <androidx.constraintlayout.widget.ConstraintLayout
+        <!-- 右上角卡片 -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardDownloadQueue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="16dp">
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginTop="16dp"
+            android:layout_gravity="top|end"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="6dp">
 
-            <!-- 页面标题 -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="下载列表"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-            <!-- 关闭按钮 -->
-            <ImageView
-                android:id="@+id/ivClose"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_close"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                android:contentDescription="TODO" />
-        </androidx.constraintlayout.widget.ConstraintLayout>
-
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerDownloads"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginTop="1dp"
-            app:adapter="@{downloadAdapter}"
-            android:nestedScrollingEnabled="false"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-            tools:listitem="@layout/item_download_task_land"
-            tools:itemCount="3"/>
-
-        <LinearLayout
-            android:id="@+id/layoutRecent"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="@{!viewModel.recentInstalled.empty ? View.VISIBLE : View.GONE}"
-            tools:visibility="visible">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="最近安装完成"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerRecent"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:nestedScrollingEnabled="false"
-                android:orientation="horizontal"
-                tools:itemCount="4"
-                tools:listitem="@layout/item_recent_install" />
-        </LinearLayout>
+                android:orientation="vertical"
+                android:background="@android:color/white">
 
-    </LinearLayout>
+                <!-- 1. 顶部标题栏 -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="下载列表"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent" />
+
+                    <ImageView
+                        android:id="@+id/ivClose"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_close"
+                        android:contentDescription="@null"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <!-- 分割线 -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider" />
+
+
+                <!-- 2. 下载任务列表区域（多任务） -->
+                <LinearLayout
+                    android:id="@+id/layoutDownloads"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="4dp"
+                    android:visibility="gone"
+                    tools:visibility="visible"
+                    >
+<!--                    多任务下载列表-->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recyclerDownloads"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false"
+                        app:adapter="@{downloadAdapter}"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                        tools:listitem="@layout/item_download_task_land"
+                        tools:itemCount="3" />
+                </LinearLayout>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                <!-- 2. 正在下载的任务卡片（和竖屏同一套数据） -->
+<!--                <androidx.constraintlayout.widget.ConstraintLayout-->
+<!--                    android:id="@+id/layoutHasTask"-->
+<!--                    android:layout_width="match_parent"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:padding="16dp"-->
+<!--                    android:visibility="@{viewModel.activeTask != null ? View.VISIBLE : View.GONE}"-->
+<!--                    tools:visibility="visible">-->
+
+<!--                    &lt;!&ndash; 应用图标 &ndash;&gt;-->
+<!--                    <ImageView-->
+<!--                        android:id="@+id/ivAppIcon"-->
+<!--                        android:layout_width="48dp"-->
+<!--                        android:layout_height="48dp"-->
+<!--                        android:src="@drawable/ic_apk_green"-->
+<!--                        app:layout_constraintStart_toStartOf="parent"-->
+<!--                        app:layout_constraintTop_toTopOf="parent"-->
+<!--                        android:contentDescription="@null" />-->
+
+<!--                    &lt;!&ndash; 应用名称 &ndash;&gt;-->
+<!--                    <TextView-->
+<!--                        android:id="@+id/tvAppName"-->
+<!--                        android:layout_width="0dp"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:layout_marginStart="12dp"-->
+<!--                        android:text="@{viewModel.activeTask.app.name}"-->
+<!--                        android:textColor="@color/text_primary"-->
+<!--                        android:textSize="15sp"-->
+<!--                        app:layout_constraintStart_toEndOf="@id/ivAppIcon"-->
+<!--                        app:layout_constraintTop_toTopOf="@id/ivAppIcon"-->
+<!--                        app:layout_constraintEnd_toStartOf="@+id/tvStatus"-->
+<!--                        tools:text="软件名称" />-->
+
+<!--                    &lt;!&ndash; 下载速度 &ndash;&gt;-->
+<!--                    <TextView-->
+<!--                        android:id="@+id/tvSpeed"-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:layout_marginTop="4dp"-->
+<!--                        android:text="@{viewModel.activeTask.speed}"-->
+<!--                        android:textColor="@color/text_secondary"-->
+<!--                        android:textSize="11sp"-->
+<!--                        app:layout_constraintStart_toStartOf="@id/tvAppName"-->
+<!--                        app:layout_constraintTop_toBottomOf="@id/tvAppName"-->
+<!--                        tools:text="1.8MB/s" />-->
+
+<!--                    &lt;!&ndash; 进度条 &ndash;&gt;-->
+<!--                    <ProgressBar-->
+<!--                        android:id="@+id/progressBar"-->
+<!--                        style="?android:attr/progressBarStyleHorizontal"-->
+<!--                        android:layout_width="0dp"-->
+<!--                        android:layout_height="4dp"-->
+<!--                        android:layout_marginTop="4dp"-->
+<!--                        android:progress="@{viewModel.activeTask.progress}"-->
+<!--                        android:progressDrawable="@drawable/bg_btn_progress_bar"-->
+<!--                        app:layout_constraintTop_toBottomOf="@id/tvSpeed"-->
+<!--                        app:layout_constraintStart_toStartOf="@id/tvSpeed"-->
+<!--                        app:layout_constraintEnd_toStartOf="@+id/tvSizeInfo"-->
+<!--                        app:layout_constraintBottom_toBottomOf="@id/ivAppIcon" />-->
+
+<!--                    &lt;!&ndash; 文件大小信息 &ndash;&gt;-->
+<!--                    <TextView-->
+<!--                        android:id="@+id/tvSizeInfo"-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:layout_marginStart="8dp"-->
+<!--                        android:text='@{viewModel.activeTask.downloadedSize + "/" + viewModel.activeTask.totalSize}'-->
+<!--                        android:textColor="@color/text_secondary"-->
+<!--                        android:textSize="11sp"-->
+<!--                        app:layout_constraintTop_toTopOf="@id/progressBar"-->
+<!--                        app:layout_constraintBottom_toBottomOf="@id/progressBar"-->
+<!--                        app:layout_constraintStart_toEndOf="@id/progressBar"-->
+<!--                        app:layout_constraintEnd_toStartOf="@+id/ivCancelDownload"-->
+<!--                        tools:text="1.8MB/83.00MB" />-->
+
+<!--                    &lt;!&ndash; 取消下载按钮 &ndash;&gt;-->
+<!--                    <ImageView-->
+<!--                        android:id="@+id/ivCancelDownload"-->
+<!--                        android:layout_width="16dp"-->
+<!--                        android:layout_height="16dp"-->
+<!--                        android:src="@drawable/ic_close"-->
+<!--                        android:layout_marginStart="8dp"-->
+<!--                        android:contentDescription="@null"-->
+<!--                        app:layout_constraintTop_toTopOf="@id/progressBar"-->
+<!--                        app:layout_constraintBottom_toBottomOf="@id/progressBar"-->
+<!--                        app:layout_constraintStart_toEndOf="@id/tvSizeInfo"-->
+<!--                        app:layout_constraintEnd_toStartOf="@+id/tvStatus" />-->
+
+<!--                    &lt;!&ndash; 下载状态按钮（显示百分比，点击暂停/继续） &ndash;&gt;-->
+<!--                    <TextView-->
+<!--                        android:id="@+id/tvStatus"-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:paddingHorizontal="10dp"-->
+<!--                        android:paddingVertical="6dp"-->
+<!--                        android:background="@drawable/bg_btn_progress"-->
+<!--                        android:gravity="center"-->
+<!--                        android:onClick="@{() -> viewModel.onStatusClick()}"-->
+<!--                        android:text='@{String.format("%.1f%%", (float)viewModel.activeTask.progress)}'-->
+<!--                        android:textColor="@color/blue_action"-->
+<!--                        android:textSize="12sp"-->
+<!--                        app:layout_constraintEnd_toEndOf="parent"-->
+<!--                        app:layout_constraintTop_toTopOf="parent"-->
+<!--                        app:layout_constraintBottom_toBottomOf="parent"-->
+<!--                        tools:text="16.3%" />-->
+<!--                </androidx.constraintlayout.widget.ConstraintLayout>-->
+
+                <!-- 3. 查看更多：初始只显示这一行，点击后展开下面“最近安装完成” -->
+                <TextView
+                    android:id="@+id/tvSeeMore"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:text="查看更多"
+                    android:textColor="@color/blue_action"
+                    android:textSize="12sp"
+                    android:gravity="end"
+                    tools:visibility="visible" />
+
+                <!-- 4. 最近安装完成区域：默认不显示，点击查看更多后显示 -->
+                <LinearLayout
+                    android:id="@+id/layoutRecent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingBottom="16dp"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <!-- 标题 -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="最近安装完成"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <!-- 最近安装应用列表（竖直排列，一列） -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recyclerRecent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:nestedScrollingEnabled="false"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                        tools:itemCount="4"
+                        tools:listitem="@layout/item_recent_install" />
+                </LinearLayout>
+
+                <!-- 5. 空状态（没有下载任务，也没有最近安装） -->
+                <LinearLayout
+                    android:id="@+id/layoutEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingTop="24dp"
+                    android:paddingBottom="24dp"
+                    android:visibility="gone"
+                    tools:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="当前没有下载任务"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+    </FrameLayout>
 </layout>
