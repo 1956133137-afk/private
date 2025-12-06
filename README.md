@@ -238,3 +238,90 @@ Repository + ViewModel 分层清晰
 完整界面布局与适配支持
 =======
 >>>>>>> origin/main
+> 
+> 
+> 
+> 
+> 主要包括以下四大核心逻辑：
+
+1. 单一真理源（Single Source of Truth）
+   之前的问题：代码严重依赖 LiveData.value 来获取当前状态。
+
+LiveData 设计初衷是用于 UI 通知的，它的更新是异步的（尤其是 postValue），而且在主线程。
+
+后果：后台线程 A 修改了状态，紧接着线程 B 去读 LiveData.value，读到的往往还是旧值。这导致线程 B 的修改覆盖了线程 A 的修改，状态就“丢了”。
+
+现在的逻辑：
+
+本地变量称王：引入 private var localAllApps。这是纯内存变量，也是所有后台逻辑唯一的**“真理”**。
+
+LiveData 退位：LiveData 仅仅作为 UI 的“显示器”。所有的逻辑计算、状态判断，全部只看 localAllApps。
+
+效果：无论 UI 更新多慢，后台逻辑永远操作的是最新的数据。
+
+2. 原子性更新与状态锁（The State Lock）
+   之前的问题：多个协程同时修改同一个应用的状态（比如一个在写进度，一个在写状态）。
+
+后果：由于没有锁，经典的“并发写入冲突”导致数据错乱。
+
+现在的逻辑：
+
+统一入口：所有修改必须经过 updateAppStatus 方法。
+
+强制排队：使用了 synchronized(stateLock)。
+
+逻辑流：
+
+线程进入锁。
+
+读取最新的 localAllApps。
+
+修改目标 App 的数据。
+
+更新 localAllApps。
+
+最后才通知 UI (postValue)。
+
+效果：就像过独木桥，同一时间只能有一个线程修改数据，绝对不会出现覆盖。
+
+3. 安全启动模式（Lazy Launch）
+   之前的问题：当你点击下载时，协程启动了，但可能任务还没来得及存入 downloadJobs Map 中，用户就点了暂停，或者任务就报错了。
+
+后果：无法暂停（因为 Map 里找不到 Job），或者任务跑飞了无法管理。
+
+现在的逻辑：
+
+先拿证，再上岗：使用了 CoroutineStart.LAZY。
+
+Kotlin
+
+val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) { ... }
+downloadJobs[id] = newJob // 1. 先确保存入 Map
+newJob.start()            // 2. 然后再让它跑
+效果：确保了只要任务在运行，它的句柄（Handle）一定在 Map 里。任何时候点击暂停，都能准确找到并杀掉这个任务。
+
+4. 异常与取消的精准区分
+   之前的问题：catch (e: Exception) 把所有错误都当成一样处理。
+
+后果：用户手动点击“暂停”（其实是 Cancel），代码却以为是网络错误，导致逻辑混乱。
+
+现在的逻辑：
+
+识别“自杀”：专门捕获 CancellationException。
+
+如果是手动取消 -> 状态设为 PAUSED。
+
+如果是网络报错 -> 状态也设为 PAUSED（防止 UI 卡死），但不抛出异常让协程崩溃。
+
+效果：逻辑非常清晰，暂停就是暂停，报错就是报错，UI 都能正确响应。
+
+总结
+这套逻辑就像是把一个**“露天菜市场”（大家随便拿数据、改数据）改造成了“银行柜台”**：
+
+数据在金库里 (localAllApps)。
+
+存取必须排队 (synchronized)。
+
+交易凭证先开好 (Lazy Launch)。
+
+这就是为什么现在的下载、暂停、进度条都变得“听话”且流畅的原因。

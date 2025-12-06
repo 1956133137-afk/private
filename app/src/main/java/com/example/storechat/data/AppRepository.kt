@@ -12,48 +12,49 @@ import com.example.storechat.model.InstallState
 import com.example.storechat.model.UpdateStatus
 import com.example.storechat.xc.XcServiceManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 object AppRepository {
 
-
-    //3个接口
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val downloadJobs = mutableMapOf<String, Job>()
 
-    //统一Retorize 接口
+    // ★ 修复1：使用线程安全的 ConcurrentHashMap 存储任务句柄
+    private val downloadJobs = ConcurrentHashMap<String, Job>()
+
     private val apiService = ApiClient.appApi
+
+    // ★ 修复2：全局状态锁，保证状态更新的原子性，防止多线程写入冲突
+    private val stateLock = Any()
+
+    // ★ 修复3：本地变量作为“绝对真理”数据源，不再依赖 LiveData.value 读取状态
+    private var localAllApps: List<AppInfo> = emptyList()
+    private var localDownloadQueue: List<AppInfo> = emptyList()
+    private var localRecentApps: List<AppInfo> = emptyList()
+
+    // LiveData 仅作为 UI 通知的“副本”，不参与逻辑计算
+    private val _allApps = MutableLiveData<List<AppInfo>>()
+    val allApps: LiveData<List<AppInfo>> = _allApps
+
+    private val _downloadQueue = MutableLiveData<List<AppInfo>>()
+    val downloadQueue: LiveData<List<AppInfo>> = _downloadQueue
+
+    private val _recentInstalledApps = MutableLiveData<List<AppInfo>>()
+    val recentInstalledApps: LiveData<List<AppInfo>> = _recentInstalledApps
 
     private val _appVersion = MutableLiveData("V1.0.0")
     val appVersion: LiveData<String> = _appVersion
+
     private val _checkUpdateResult = MutableLiveData<UpdateStatus?>()
     val checkUpdateResult: LiveData<UpdateStatus?> = _checkUpdateResult
 
-    fun checkAppUpdate() {
-        coroutineScope.launch {
-            delay(800L)
-            val current = _appVersion.value?.removePrefix("V") ?: "1.0.0"
-            // 这里仍然是模拟，后面可换成 apiService.checkUpdate(...)
-            val latestFromServer = "1.0.1"
-            val status = if (latestFromServer == current) UpdateStatus.LATEST else UpdateStatus.NEW_VERSION(latestFromServer)
-            _checkUpdateResult.postValue(status)
-        }
-    }
-
-    fun clearUpdateResult() {
-        _checkUpdateResult.postValue(null)
-    }
-    // 应用列表 & 分类
-    private val _allApps = MutableLiveData<List<AppInfo>>(emptyList())
-    val allApps: LiveData<List<AppInfo>> = _allApps
-
     private val _selectedCategory = MutableLiveData(AppCategory.YANNUO)
 
-    // 由 allApps 和 selectedCategory 派生出分类应用列表
     val categorizedApps: LiveData<List<AppInfo>> = MediatorLiveData<List<AppInfo>>().apply {
         addSource(allApps) { apps ->
             value = apps.filter { it.category == _selectedCategory.value }
@@ -62,13 +63,6 @@ object AppRepository {
             value = allApps.value?.filter { it.category == category }
         }
     }
-
-    //下载接口 & 最近安装
-    private val _downloadQueue = MutableLiveData<List<AppInfo>>(emptyList())
-    val downloadQueue: LiveData<List<AppInfo>> = _downloadQueue
-
-    private val _recentInstalledApps = MutableLiveData<List<AppInfo>>(emptyList())
-    val recentInstalledApps: LiveData<List<AppInfo>> = _recentInstalledApps
 
     init {
         val initialApps = listOf(
@@ -82,9 +76,8 @@ object AppRepository {
                 name = "应用名称C", description = "应用简介说明...", size = "83MB",
                 downloadCount = 1002, packageName = "com.demo.appc",
                 apkPath = "/sdcard/apks/app_a_103.apk",
-                // 假设当前机器上其实是 1.0.2，这里标记为已安装旧版本，按钮就会显示“升级”
                 installState = InstallState.INSTALLED_OLD,
-                versionName = "1.0.4",   // 新版本号
+                versionName = "1.0.4",
                 releaseDate = "2025-11-12",
                 category = AppCategory.YANNUO
             ),
@@ -100,7 +93,6 @@ object AppRepository {
                 apkPath = "/sdcard/apks/icbc_mobilebank.apk", installState = InstallState.NOT_INSTALLED,
                 versionName = "8.2.0.1.1", releaseDate = "2025-11-05", category = AppCategory.ICBC
             ),
-
             AppInfo(
                 name = "建行生活", description = "吃喝玩乐建行优惠", size = "70MB",
                 downloadCount = 300000, packageName = "com.ccb.life",
@@ -108,18 +100,69 @@ object AppRepository {
                 versionName = "3.2.1", releaseDate = "2025-11-08", category = AppCategory.CCB
             )
         )
-        _allApps.postValue(initialApps)
 
-        //    启动时尝试用接口刷新默认分类（如果接口未通，会自动忽略异常）
+        // 初始化本地数据源和 LiveData
+        synchronized(stateLock) {
+            localAllApps = initialApps
+            _allApps.postValue(localAllApps)
+        }
+
         coroutineScope.launch {
             refreshAppsFromServer(AppCategory.YANNUO)
         }
     }
 
+    // --- 核心修复：线程安全的状态更新 ---
+    // 所有的状态修改都必须经过这个方法，且加锁，基于本地 localAllApps 修改
+    private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
+        synchronized(stateLock) {
+            // 1. 基于最新的本地数据源进行修改（不再读取可能过时的 LiveData.value）
+            val app = localAllApps.find { it.packageName == packageName } ?: return
+            val newApp = transform(app)
 
-    /**
-     * UI 选择分类时调用
-     */
+            // 2. 更新本地数据源
+            localAllApps = localAllApps.map { if (it.packageName == packageName) newApp else it }
+
+            // 3. 同步更新下载队列（如果存在于队列中）
+            if (localDownloadQueue.any { it.packageName == packageName }) {
+                localDownloadQueue = localDownloadQueue.map { if (it.packageName == packageName) newApp else it }
+                _downloadQueue.postValue(localDownloadQueue)
+            }
+
+            // 4. 最后推送给 UI
+            _allApps.postValue(localAllApps)
+        }
+    }
+
+    // 线程安全的添加下载任务
+    private fun addToDownloadQueue(app: AppInfo) {
+        synchronized(stateLock) {
+            if (localDownloadQueue.none { it.packageName == app.packageName }) {
+                localDownloadQueue = localDownloadQueue + app
+                _downloadQueue.postValue(localDownloadQueue)
+            }
+        }
+    }
+
+    // 线程安全的移除下载任务
+    private fun removeFromDownloadQueue(packageName: String) {
+        synchronized(stateLock) {
+            localDownloadQueue = localDownloadQueue.filterNot { it.packageName == packageName }
+            _downloadQueue.postValue(localDownloadQueue)
+        }
+    }
+
+    // 线程安全的添加最近安装
+    private fun addToRecentInstalled(app: AppInfo) {
+        synchronized(stateLock) {
+            // 避免重复添加
+            if (localRecentApps.none { it.packageName == app.packageName }) {
+                localRecentApps = listOf(app) + localRecentApps
+                _recentInstalledApps.postValue(localRecentApps)
+            }
+        }
+    }
+
     fun selectCategory(category: AppCategory) {
         _selectedCategory.postValue(category)
         coroutineScope.launch {
@@ -127,10 +170,6 @@ object AppRepository {
         }
     }
 
-    /**
-     * a. 应用列表接口：按分类从服务端获取列表
-     * 目前失败时静默忽略，保留本地数据
-     */
     private suspend fun refreshAppsFromServer(category: AppCategory) {
         try {
             val categoryParam = when (category) {
@@ -140,41 +179,17 @@ object AppRepository {
             }
             val remoteList = apiService.getAppList(categoryParam)
 
-            // 更新 allApps 列表
-            _allApps.value?.let { currentApps ->
-                val otherApps = currentApps.filter { it.category != category }
-                _allApps.postValue(otherApps + remoteList)
+            synchronized(stateLock) {
+                // 保留其他分类的本地数据，替换当前分类的数据
+                val otherApps = localAllApps.filter { it.category != category }
+                localAllApps = otherApps + remoteList
+                _allApps.postValue(localAllApps)
             }
         } catch (e: Exception) {
-            // 接口未通或报错时保持原有本地数据即可
+            // 接口异常忽略，保持本地数据
         }
     }
 
-    //内部工具函数
-    private fun findApp(packageName: String): AppInfo? {
-        return _allApps.value?.find { it.packageName == packageName }
-    }
-
-    private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
-        val app = findApp(packageName) ?: return
-        val newApp = transform(app)
-
-        _allApps.value?.let { list ->
-            _allApps.postValue(list.map { if (it.packageName == packageName) newApp else it })
-        }
-
-        _downloadQueue.value?.let { list ->
-            if (list.any{ it.packageName == packageName }) {
-                _downloadQueue.postValue(list.map { if (it.packageName == packageName) newApp else it })
-            }
-        }
-    }
-
-
-    /**
-     * b. 统一封装“下载链接获取逻辑”
-     * - 接入接口后只要改这里，不用改 UI 和其他业务代码
-     */
     private suspend fun resolveDownloadApkPath(
         packageName: String,
         fallbackApkPath: String,
@@ -185,201 +200,134 @@ object AppRepository {
                 packageName = packageName,
                 versionName = versionName
             )
-            val url = resp.url
-            if (url.isBlank()) fallbackApkPath else url
+            if (resp.url.isBlank()) fallbackApkPath else resp.url
         } catch (e: Exception) {
-            // 接口失败时直接用原来的 apkPath，保证 Demo 仍可运行
             fallbackApkPath
         }
     }
 
-
-    //    下载队列 & 安装逻辑
-
-    //    下载队列 & 安装逻辑
     fun toggleDownload(app: AppInfo) {
         when (app.downloadStatus) {
-            // 1. 正在下载 -> 点击变为暂停
             DownloadStatus.DOWNLOADING -> {
+                // 点击暂停：取消 Job。Job 取消会抛出 CancellationException，在 launch 的 catch 块中处理状态回滚
                 downloadJobs[app.packageName]?.cancel()
-                downloadJobs.remove(app.packageName)
-                updateAppStatus(app.packageName) {
-                    it.copy(downloadStatus = DownloadStatus.PAUSED)
-                }
             }
 
-            // 2. 未在下载 / 已暂停 -> 开始（或继续）下载：包括“安装”和“升级”
             DownloadStatus.NONE, DownloadStatus.PAUSED -> {
-                val currentQueue = _downloadQueue.value ?: emptyList()
-                if (currentQueue.none { it.packageName == app.packageName }) {
-                    _downloadQueue.postValue(currentQueue + app)
+                // ★ 关键防抖：如果 Map 中已存在 Job，说明已经在启动中或运行中，直接返回，防止覆盖 Job 导致旧任务失控
+                if (downloadJobs.containsKey(app.packageName)) {
+                    return
                 }
 
-                val newJob = coroutineScope.launch {
-                    // 先解析出真正要用的 apk 下载地址（接口 or 本地路径）
-                    val realApkPath = resolveDownloadApkPath(
-                        packageName = app.packageName,
-                        fallbackApkPath = app.apkPath,
-                        versionName = app.versionName   // 这里带上版本号，后端即可区分是升级哪一版
-                    )
+                // 添加到队列
+                addToDownloadQueue(app)
 
-                    // 标记为下载中
-                    updateAppStatus(app.packageName) {
-                        it.copy(downloadStatus = DownloadStatus.DOWNLOADING)
-                    }
-
-                    // 模拟下载进度
-                    for (p in app.progress..100) {
-                        delay(80L)
-                        updateAppStatus(app.packageName) { it.copy(progress = p) }
-                    }
-
-                    // 验证
-                    updateAppStatus(app.packageName) {
-                        it.copy(downloadStatus = DownloadStatus.VERIFYING)
-                    }
-                    delay(500)
-
-                    // 安装
-                    updateAppStatus(app.packageName) {
-                        it.copy(downloadStatus = DownloadStatus.INSTALLING)
-                    }
-                    // ★ 这里用 realApkPath，确保升级时是装“新包”
-                    XcServiceManager.installApk(realApkPath, app.packageName, true)
-                    delay(1500)
-
-                    // 安装完成 -> 变为“已最新”，并从下载队列移除，加入“最近安装”
-                    var installedApp: AppInfo? = null
-                    updateAppStatus(app.packageName) {
-                        installedApp = it.copy(
-                            downloadStatus = DownloadStatus.NONE,
-                            progress = 0,
-                            installState = InstallState.INSTALLED_LATEST
+                // ★ 修复4：使用 LAZY 启动模式
+                // 确保 Job 在真正开始运行前，一定已经被放入 downloadJobs Map 中
+                // 避免“任务开始了但还没存入Map，此时用户点击暂停无法找到Job”的竞态条件
+                val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
+                    try {
+                        // 1. 获取下载地址（模拟网络耗时）
+                        val realApkPath = resolveDownloadApkPath(
+                            packageName = app.packageName,
+                            fallbackApkPath = app.apkPath,
+                            versionName = app.versionName
                         )
-                        installedApp!!
-                    }
 
-                    downloadJobs.remove(app.packageName)
-                    _downloadQueue.value?.let { queue ->
-                        _downloadQueue.postValue(queue.filterNot { it.packageName == app.packageName })
-                    }
+                        // 2. 更新状态为下载中
+                        updateAppStatus(app.packageName) {
+                            it.copy(downloadStatus = DownloadStatus.DOWNLOADING)
+                        }
 
-                    installedApp?.let { appInfo ->
-                        val currentRecent = _recentInstalledApps.value ?: emptyList()
-                        _recentInstalledApps.postValue(listOf(appInfo) + currentRecent)
+                        // 3. 模拟下载进度
+                        for (p in app.progress..100) {
+                            delay(80L)
+                            updateAppStatus(app.packageName) { it.copy(progress = p) }
+                        }
+
+                        // 4. 验证中
+                        updateAppStatus(app.packageName) {
+                            it.copy(downloadStatus = DownloadStatus.VERIFYING)
+                        }
+                        delay(500)
+
+                        // 5. 安装中
+                        updateAppStatus(app.packageName) {
+                            it.copy(downloadStatus = DownloadStatus.INSTALLING)
+                        }
+                        XcServiceManager.installApk(realApkPath, app.packageName, true)
+                        delay(1500)
+
+                        // 6. 安装完成
+                        var installedApp: AppInfo? = null
+                        updateAppStatus(app.packageName) {
+                            installedApp = it.copy(
+                                downloadStatus = DownloadStatus.NONE,
+                                progress = 0,
+                                installState = InstallState.INSTALLED_LATEST
+                            )
+                            installedApp!!
+                        }
+
+                        // 7. 成功结束：清理资源
+                        downloadJobs.remove(app.packageName)
+                        removeFromDownloadQueue(app.packageName)
+                        installedApp?.let { addToRecentInstalled(it) }
+
+                    } catch (e: Exception) {
+                        // ★ 修复5：正确区分“手动暂停”和“异常错误”
+                        if (e is kotlinx.coroutines.CancellationException) {
+                            // 手动暂停：从 Map 移除，状态设为 PAUSED
+                            downloadJobs.remove(app.packageName)
+                            updateAppStatus(app.packageName) {
+                                it.copy(downloadStatus = DownloadStatus.PAUSED)
+                            }
+                            throw e // 重新抛出，让协程框架知道是取消
+                        } else {
+                            // 网络错误等：也重置为 PAUSED，防止 UI 卡死在下载中
+                            downloadJobs.remove(app.packageName)
+                            updateAppStatus(app.packageName) {
+                                it.copy(downloadStatus = DownloadStatus.PAUSED)
+                            }
+                        }
                     }
                 }
 
+                // 先存入 Map，再启动，保证 Map 中一定有值
                 downloadJobs[app.packageName] = newJob
+                newJob.start()
             }
 
-            // 3. 验证/安装阶段点击无效
             DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {
-                downloadJobs[app.packageName]?.cancel()
-                downloadJobs.remove(app.packageName)
-                updateAppStatus(app.packageName) {
-                    it.copy(downloadStatus = DownloadStatus.PAUSED)
-                }
+                // 验证和安装阶段不可暂停，忽略点击
             }
-
         }
     }
 
-
-
-
-
-//    fun toggleDownload(app: AppInfo) {
-//        when (app.downloadStatus) {
-//            DownloadStatus.DOWNLOADING -> {
-//                downloadJobs[app.packageName]?.cancel()
-//                downloadJobs.remove(app.packageName)
-//                updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
-//            }
-//            DownloadStatus.NONE, DownloadStatus.PAUSED -> {
-//                val currentQueue = _downloadQueue.value ?: emptyList()
-//                if (currentQueue.none { it.packageName == app.packageName }) {
-//                    _downloadQueue.postValue(currentQueue + app)
-//                }
-//
-//                val newJob = coroutineScope.launch {
-////                   先解析出真正要用的 apk 下载地址（接口 or 本地路径）
-//                    val realApkPath = resolveDownloadApkPath(
-//                        packageName = app.packageName,
-//                        fallbackApkPath = app.apkPath,
-//                        versionName = app.versionName
-//                    )
-//                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.DOWNLOADING) }
-//
-//                    for (p in app.progress..100) {
-//                        delay(80L)
-//                        updateAppStatus(app.packageName) { it.copy(progress = p) }
-//                    }
-//
-//                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.VERIFYING) }
-//                    delay(500)
-//
-//                    updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.INSTALLING) }
-//                    XcServiceManager.installApk(app.apkPath, app.packageName, true)
-//                    delay(1500)
-//
-//                    var installedApp: AppInfo? = null
-//                    updateAppStatus(app.packageName) {
-//                        installedApp = it.copy(
-//                            downloadStatus = DownloadStatus.NONE,
-//                            progress = 0,
-//                            installState = InstallState.INSTALLED_LATEST
-//                        )
-//                        installedApp!!
-//                    }
-//                    downloadJobs.remove(app.packageName)
-//                    _downloadQueue.value?.let { queue ->
-//                        _downloadQueue.postValue(queue.filterNot { it.packageName == app.packageName })
-//                    }
-//                    installedApp?.let { appInfo ->
-//                        val currentRecent = _recentInstalledApps.value ?: emptyList()
-//                        _recentInstalledApps.postValue(listOf(appInfo) + currentRecent)
-//                    }
-//                }
-//                downloadJobs[app.packageName] = newJob
-//            }
-//            DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {
-//                //忽略
-//            }
-//        }
-//    }
-
     fun cancelDownload(app: AppInfo) {
+        // 取消协程
         downloadJobs[app.packageName]?.cancel()
         downloadJobs.remove(app.packageName)
+
+        // 强制移除：恢复为未下载状态
         updateAppStatus(app.packageName) {
-            it.copy(
-                downloadStatus = DownloadStatus.NONE,
-                progress = 0
-            )
+            it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
         }
+        removeFromDownloadQueue(app.packageName)
     }
 
     fun removeDownload(app: AppInfo) {
-        _downloadQueue.value?.let { list ->
-            _downloadQueue.postValue(list.filterNot { it.packageName == app.packageName })
-        }
+        removeFromDownloadQueue(app.packageName)
     }
-    // ---------------- c. 历史版本列表 & 安装 ----------------
 
-    /**
-     * 历史版本列表接口预留：
-     * - 先尝试从接口获取
-     * - 接口失败或返回空，则回退到本地假数据
-     */
     suspend fun loadHistoryVersions(app: AppInfo): List<HistoryVersion> {
         return try {
             val versions = apiService.getAppHistory(app.packageName)
             if (versions.isNotEmpty()) {
-                versions.map { versionInfo ->
+                versions.map {
                     HistoryVersion(
-                        versionName = versionInfo.versionName,
-                        apkPath = versionInfo.apkPath
+                        versionName = it.versionName,
+                        apkPath = it.apkPath
                     )
                 }
             } else {
@@ -394,16 +342,10 @@ object AppRepository {
         return listOf(
             HistoryVersion("1.0.2", "/sdcard/apks/${app.packageName}_102.apk"),
             HistoryVersion("1.0.1", "/sdcard/apks/${app.packageName}_101.apk"),
-
             HistoryVersion("1.0.0", "/sdcard/apks/${app.packageName}_100.apk")
         )
     }
 
-    /**
-     * 历史版本安装：
-     * - 被 HistoryVersionFragment 在点击“安装”时调用
-     * - 内部同样通过 resolveDownloadApkPath 统一处理下载链接
-     */
     fun installHistoryVersion(packageName: String, historyVersion: HistoryVersion) {
         coroutineScope.launch {
             val realApkPath = resolveDownloadApkPath(
@@ -414,28 +356,29 @@ object AppRepository {
             XcServiceManager.installApk(realApkPath, packageName, true)
         }
     }
-    /**
-     * 恢复所有“已暂停”的下载任务
-     * 被下载队列页的「全部继续」调用
-     */
-    // AppRepository.kt
-    /**
-     * 恢复所有“已暂停”的下载任务
-     * 被下载队列页的「全部继续」按钮调用
-     */
+
     fun resumeAllPausedDownloads() {
-        // 取一个当前下载队列的快照，避免遍历过程中列表被修改
-        val queueSnapshot = _downloadQueue.value ?: emptyList()
-
-        // 只操作 downloadStatus = PAUSED 的任务，其他状态一律不碰
-        val pausedApps = queueSnapshot.filter { it.downloadStatus == DownloadStatus.PAUSED }
-
-        pausedApps.forEach { app ->
-            // 复用单个任务的逻辑：PAUSED -> 调用 toggleDownload 会变成 DOWNLOADING
-            toggleDownload(app)
+        // 使用本地队列的快照，避免并发修改问题
+        val pausedApps = synchronized(stateLock) {
+            localDownloadQueue.filter { it.downloadStatus == DownloadStatus.PAUSED }
+        }
+        // 依次触发下载，由于有了防抖和锁，这里不会再造成状态错乱
+        pausedApps.forEach {
+            toggleDownload(it)
         }
     }
 
+    fun checkAppUpdate() {
+        coroutineScope.launch {
+            delay(800L)
+            val current = _appVersion.value?.removePrefix("V") ?: "1.0.0"
+            val latestFromServer = "1.0.1"
+            val status = if (latestFromServer == current) UpdateStatus.LATEST else UpdateStatus.NEW_VERSION(latestFromServer)
+            _checkUpdateResult.postValue(status)
+        }
+    }
 
-
+    fun clearUpdateResult() {
+        _checkUpdateResult.postValue(null)
+    }
 }
