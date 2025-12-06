@@ -275,8 +275,13 @@ object AppRepository {
 
             // 3. 验证/安装阶段点击无效
             DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {
-                // 忽略点击
+                downloadJobs[app.packageName]?.cancel()
+                downloadJobs.remove(app.packageName)
+                updateAppStatus(app.packageName) {
+                    it.copy(downloadStatus = DownloadStatus.PAUSED)
+                }
             }
+
         }
     }
 
@@ -409,4 +414,28 @@ object AppRepository {
             XcServiceManager.installApk(realApkPath, packageName, true)
         }
     }
+    /**
+     * 恢复所有“已暂停”的下载任务
+     * 被下载队列页的「全部继续」调用
+     */
+    // AppRepository.kt
+    /**
+     * 恢复所有“已暂停”的下载任务
+     * 被下载队列页的「全部继续」按钮调用
+     */
+    fun resumeAllPausedDownloads() {
+        // 取一个当前下载队列的快照，避免遍历过程中列表被修改
+        val queueSnapshot = _downloadQueue.value ?: emptyList()
+
+        // 只操作 downloadStatus = PAUSED 的任务，其他状态一律不碰
+        val pausedApps = queueSnapshot.filter { it.downloadStatus == DownloadStatus.PAUSED }
+
+        pausedApps.forEach { app ->
+            // 复用单个任务的逻辑：PAUSED -> 调用 toggleDownload 会变成 DOWNLOADING
+            toggleDownload(app)
+        }
+    }
+
+
+
 }

@@ -68,7 +68,7 @@
             </androidx.constraintlayout.widget.ConstraintLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- Main scrollable content -->
+        <!-- 2. 主体内容 -->
         <androidx.core.widget.NestedScrollView
             android:layout_width="0dp"
             android:layout_height="0dp"
@@ -83,7 +83,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Downloading Task Section -->
+                <!-- 2.1 正在下载区域 -->
                 <LinearLayout
                     android:id="@+id/layoutHasTask"
                     android:layout_width="match_parent"
@@ -93,16 +93,38 @@
                     android:visibility="@{!viewModel.downloadTasks.empty ? View.VISIBLE : View.GONE}"
                     tools:visibility="visible">
 
-                    <TextView
-                        android:id="@+id/tvDownloadingTitle"
-                        android:layout_width="wrap_content"
+                    <!-- 头部一行：左“正在下载(x)”，右“全部继续” -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text='@{"正在下载(" + viewModel.downloadTasks.size() + ")"}'
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        tools:text="正在下载(1)"/>
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
+                        <TextView
+                            android:id="@+id/tvDownloadingTitle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text='@{"正在下载(" + viewModel.downloadTasks.size() + ")"}'
+                            android:textColor="@color/text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            tools:text="正在下载(1)" />
+
+                        <TextView
+                            android:id="@+id/tvResumeAll"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="全部继续"
+                            android:textColor="@color/blue_action"
+                            android:textSize="13sp"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+                    </LinearLayout>
+
+                    <!-- 下载任务列表 -->
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/recyclerDownloads"
                         android:layout_width="match_parent"
@@ -112,11 +134,11 @@
                         android:nestedScrollingEnabled="false"
                         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
                         tools:listitem="@layout/item_download_task"
-                        tools:itemCount="2"/>
+                        tools:itemCount="2" />
 
                 </LinearLayout>
 
-                <!-- Recently Installed Section -->
+                <!-- 2.2 最近安装完成 -->
                 <LinearLayout
                     android:id="@+id/layoutRecent"
                     android:layout_width="match_parent"
@@ -152,7 +174,7 @@
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 
-        <!-- Empty State Section -->
+        <!-- 3. 空页面 -->
         <LinearLayout
             android:id="@+id/layoutEmpty"
             android:layout_width="0dp"

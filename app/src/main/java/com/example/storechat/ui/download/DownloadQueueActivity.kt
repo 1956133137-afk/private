@@ -10,6 +10,7 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.storechat.databinding.ActivityDownloadQueueBinding
+import com.example.storechat.model.DownloadStatus
 import com.example.storechat.ui.detail.AppDetailActivity
 import com.example.storechat.ui.search.SearchActivity
 
@@ -35,16 +36,17 @@ class DownloadQueueActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        // This adapter is for the portrait layout's download list
+        // 下载列表
         downloadAdapter = DownloadQueueAdapter(viewModel)
-        binding.adapter = downloadAdapter // Used by data binding in activity_download_queue.xml
+        binding.adapter = downloadAdapter
 
-        // This adapter is for the recent apps list in both layouts (if the view exists)
+        // 最近安装
         recentAdapter = DownloadRecentAdapter { app ->
             AppDetailActivity.start(this, app)
         }
 
-        binding.recyclerDownloads?.layoutManager = LinearLayoutManager(this@DownloadQueueActivity)
+        binding.recyclerDownloads?.layoutManager =
+            LinearLayoutManager(this@DownloadQueueActivity)
 
         binding.recyclerRecent?.apply {
             adapter = recentAdapter
@@ -53,10 +55,14 @@ class DownloadQueueActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        // These views are in activity_download_queue.xml and are safe to reference
         binding.ivBack?.setOnClickListener { finish() }
         binding.ivSearch?.setOnClickListener { SearchActivity.start(this) }
         binding.btnBackHome?.setOnClickListener { finish() }
+
+        // 顶部「全部继续」
+        binding.tvResumeAll?.setOnClickListener {
+            viewModel.resumeAllPausedTasks()
+        }
     }
 
     private fun observeViewModel() {
@@ -75,6 +81,10 @@ class DownloadQueueActivity : AppCompatActivity() {
         viewModel.downloadTasks.observe(this) { tasks ->
             downloadAdapter.submitList(tasks)
             updateEmptyViewVisibility()
+
+            // 只要还有“已暂停”的任务，就显示「全部继续」
+            binding.tvResumeAll?.isVisible =
+                tasks.any { it.status == DownloadStatus.PAUSED }
         }
     }
 

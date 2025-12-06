@@ -24,7 +24,7 @@
     <color name="salmon">#FA8072</color>       <!-- 鲑鱼红 -->
 
     <!-- 蓝色系 -->
-    <color name="royal_blue">#4169E1</color>   <!-- 皇家蓝 -->
+    <color name="royal_blue">#CCCCCC</color>   <!-- 皇家蓝 -->
     <color name="steel_blue">#4682B4</color>   <!-- 钢蓝 -->
     <color name="sky_blue">#87CEEB</color>     <!-- 天空蓝 -->
     <color name="cornflower_blue">#6495ED</color> <!-- 矢车菊蓝 -->

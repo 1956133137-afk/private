@@ -11,6 +11,8 @@ import com.example.storechat.model.DownloadStatus
 
 class DownloadQueueViewModel : ViewModel() {
 
+
+
     // region Data for Landscape (Single Task) & backward compatibility
     val activeTask: LiveData<DownloadTask?> = AppRepository.downloadQueue.map { queue ->
         queue.firstOrNull()?.let {
@@ -66,12 +68,15 @@ class DownloadQueueViewModel : ViewModel() {
     // endregion
 
     // region Common Data & Actions
+    // region Common Data & Actions
     val recentInstalled: LiveData<List<AppInfo>> = AppRepository.recentInstalledApps
 
     private val _toastMessage = MutableLiveData<String?>()
     val toastMessage: LiveData<String?> = _toastMessage
 
+    /** 顶部「全部继续」按钮 */
     fun resumeAllPausedTasks() {
+        AppRepository.resumeAllPausedDownloads()
         _toastMessage.value = "已全部继续"
     }
 
@@ -79,4 +84,5 @@ class DownloadQueueViewModel : ViewModel() {
         _toastMessage.value = null
     }
     // endregion
+
 }
