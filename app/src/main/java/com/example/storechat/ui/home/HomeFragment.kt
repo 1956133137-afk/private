@@ -59,7 +59,6 @@ class HomeFragment : Fragment() {
                 addTab(newTab().setText(category.title))
             }
 
-            // 强制标签左对齐
             tabGravity = TabLayout.GRAVITY_FILL
             tabMode = TabLayout.MODE_SCROLLABLE
         }
@@ -74,7 +73,7 @@ class HomeFragment : Fragment() {
             override fun onTabReselected(tab: TabLayout.Tab) {}
         })
 
-        // 为横屏的真实搜索框和按钮设置点击事件
+        // 搜索按钮 & 键盘搜索
         binding.ivSearch?.setOnClickListener { performSearch() }
         binding.etSearch?.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
@@ -85,19 +84,60 @@ class HomeFragment : Fragment() {
             }
         }
 
-        binding.ivDownloadManager?.setOnClickListener {
+        // 添加点击输入框时恢复焦点，显示光标
+        binding.etSearch?.setOnClickListener {
+            binding.etSearch?.requestFocus()
+        }
+
+
+
+        // 下载按钮点击：清红点 + 跳转下载页 / 抽屉
+        val openDownloadPage: () -> Unit = {
+            viewModel.onDownloadIconClicked()
             if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 (activity as? MainActivity)?.openDrawer()
             } else {
                 startActivity(Intent(requireContext(), DownloadQueueActivity::class.java))
             }
         }
+        binding.ivDownloadManager?.setOnClickListener { openDownloadPage() }
+        binding.layoutDownloadIcon?.setOnClickListener { openDownloadPage() }
+
         binding.tvVersion?.setOnClickListener { viewModel.checkAppUpdate() }
     }
 
+    /**
+     * 搜索：
+     *  - 横屏：在首页内联模糊查询（只刷新下方列表，不跳转）
+     *  - 竖屏：保持原行为，跳转 SearchActivity
+     */
+//    private fun performSearch() {
+//        val keyword = binding.etSearch?.text?.toString().orEmpty()
+//
+//        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+//            // 横屏：首页完成搜索
+//            viewModel.inlineSearch(keyword)
+//        } else {
+//            // 竖屏：维持原逻辑
+//            SearchActivity.start(requireContext(), keyword)
+//        }
+//    }
+
+
+
     private fun performSearch() {
-        val keyword = binding.etSearch?.text.toString() ?: ""
-        SearchActivity.start(requireContext(), keyword)
+        val keyword = binding.etSearch?.text.toString().orEmpty()
+
+        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE){
+//            横屏：直接在首页内联搜索
+            viewModel.inlineSearch(keyword)
+            // 清除 EditText 焦点，隐藏光标
+            binding.etSearch?.clearFocus()
+        }else{
+//            竖屏：跳转到 SearchActivity
+            SearchActivity.start(requireContext(), keyword)
+        }
+
     }
 
     private fun observeViewModel() {
@@ -107,7 +147,12 @@ class HomeFragment : Fragment() {
 
         viewModel.checkUpdateResult.observe(viewLifecycleOwner) { status ->
             when (status) {
-                is UpdateStatus.LATEST -> Toast.makeText(requireContext(), "当前已是最新版本", Toast.LENGTH_SHORT).show()
+                is UpdateStatus.LATEST -> Toast.makeText(
+                    requireContext(),
+                    "当前已是最新版本",
+                    Toast.LENGTH_SHORT
+                ).show()
+
                 is UpdateStatus.NEW_VERSION -> showUpdateDialog(status.latestVersion)
                 null -> {}
             }
@@ -116,13 +161,50 @@ class HomeFragment : Fragment() {
 
         viewModel.navigationEvent.observe(viewLifecycleOwner) { packageName ->
             if (packageName != null) {
-                val intent = requireContext().packageManager.getLaunchIntentForPackage(packageName)
+                val intent =
+                    requireContext().packageManager.getLaunchIntentForPackage(packageName)
                 if (intent != null) {
                     startActivity(intent)
                 } else {
                     Toast.makeText(requireContext(), "无法打开应用", Toast.LENGTH_SHORT).show()
                 }
                 viewModel.onNavigationComplete()
+            }
+        }
+
+        // ======= 下载图标 / 进度圈 / 红点联动 =======
+
+        // 是否有下载任务：决定进度圈是否显示
+        viewModel.isDownloadInProgress.observe(viewLifecycleOwner) { inProgress ->
+            val progressCircle = binding.cpiDownloadProgress
+            val downloadIcon = binding.ivDownloadManager
+            val redDot = binding.viewDownloadDot
+
+            if (inProgress == true) {
+                progressCircle?.visibility = View.VISIBLE
+                downloadIcon?.visibility = View.VISIBLE
+                redDot?.visibility = View.GONE
+            } else {
+                progressCircle?.visibility = View.GONE
+                downloadIcon?.visibility = View.VISIBLE
+                // 红点显示交给 downloadFinishedDotVisible
+            }
+        }
+
+        // 总进度：驱动圆形进度圈，让圆环慢慢包围图标
+        viewModel.totalDownloadProgress.observe(viewLifecycleOwner) { progress ->
+            val value = (progress ?: 0).coerceIn(0, 100)
+            binding.cpiDownloadProgress?.setProgressCompat(value, true)
+        }
+
+        // 下载完成红点：仅在没有下载进行时显示
+        viewModel.downloadFinishedDotVisible.observe(viewLifecycleOwner) { visible ->
+            val redDot = binding.viewDownloadDot
+            val inProgress = viewModel.isDownloadInProgress.value == true
+            redDot?.visibility = if (!inProgress && visible == true) {
+                View.VISIBLE
+            } else {
+                View.GONE
             }
         }
     }

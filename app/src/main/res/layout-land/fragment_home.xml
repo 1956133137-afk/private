@@ -53,15 +53,43 @@
                     app:layout_constraintBottom_toBottomOf="@id/ivLogo"
                     app:layout_constraintStart_toEndOf="@id/ivLogo" />
 
-                 <ImageView
-                    android:id="@+id/ivDownloadManager"
+                <!-- 下载区域：进度圈 + 图标 + 红点 -->
+                <FrameLayout
+                    android:id="@+id/layoutDownloadIcon"
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_marginEnd="12dp"
-                    android:src="@drawable/ic_download"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent" />
+                    app:layout_constraintEnd_toEndOf="parent">
+
+                    <com.google.android.material.progressindicator.CircularProgressIndicator
+                        android:id="@+id/cpiDownloadProgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:indeterminate="false"
+                        android:max="100"
+                        app:indicatorSize="24dp"
+                        app:trackThickness="2dp"
+                        app:indicatorInset="0dp"
+                        android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/ivDownloadManager"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_download"
+                        android:contentDescription="@null" />
+
+                    <View
+                        android:id="@+id/viewDownloadDot"
+                        android:layout_width="6dp"
+                        android:layout_height="6dp"
+                        android:layout_gravity="end|top"
+                        android:background="@drawable/bg_red_dot"
+                        android:visibility="gone" />
+                </FrameLayout>
 
                 <ImageView
                     android:id="@+id/ivSearch"
@@ -71,16 +99,15 @@
                     android:src="@drawable/ic_search_b"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toStartOf="@id/ivDownloadManager"
+                    app:layout_constraintEnd_toStartOf="@id/layoutDownloadIcon"
                     android:layout_marginEnd="8dp"/>
-                    
+
                 <EditText
                     android:id="@+id/etSearch"
                     android:layout_width="212dp"
                     android:layout_height="24dp"
                     android:layout_marginEnd="8dp"
                     android:background="@drawable/bg_search_edit_text_land_no_corners"
-
                     android:drawablePadding="1dp"
                     android:gravity="start|center_vertical"
                     android:hint="请输入订单号"
