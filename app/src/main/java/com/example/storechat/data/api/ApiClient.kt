@@ -11,8 +11,8 @@ import retrofit2.converter.gson.GsonConverterFactory
  */
 object ApiClient {
 
-    // TODO: 接入真实接口时，替换成你的服务地址（必须以 / 结尾）
-    private const val BASE_URL = "http://127.0.0.1/"
+    // 换成测试环境域名，注意以 / 结尾
+    private const val BASE_URL = "https://test.yannuozhineng.com/acms/api/"
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {
         HttpLoggingInterceptor().apply {
@@ -23,7 +23,7 @@ object ApiClient {
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-        // 先加签，再打印日志，这样日志里能看到最终发送给服务器的完整 JSON
+            // 先加签，再打印日志，这样日志里能看到最终发送给服务器的完整 JSON
             .addInterceptor(SignInterceptor())
             .addInterceptor(loggingInterceptor)
             .build()

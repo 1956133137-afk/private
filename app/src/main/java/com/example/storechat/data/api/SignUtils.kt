@@ -70,19 +70,38 @@ object SignUtils {
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
+    /**
+     * 测试：按“获取 MQTT 连接信息”接口生成一整套签名数据
+     * 只打印日志，不真正发请求
+     */
     fun testSign(): String {
-        val appId = "testAppId"
-        val appSecret = "testSecret123"
-        val deviceId = "device123"
-        val timestamp = 1700000000L
-        val nonce = "abc123xyz"
+        // 用 SignConfig 里的配置（记得自己在 SignConfig 里改真实值）
+        val appId = SignConfig.APP_ID
+        val appSecret = SignConfig.APP_SECRET
+        val deviceId = SignConfig.getDeviceId()
 
-        // 原始业务 JSON 字符串
-        val bizJsonString = """{"category":"1"}"""
+        val timestamp = generateTimestampSeconds()
+        val nonce = generateNonce(32)
 
-        // 如果你写了 canonicalJson，就用它；没有就直接用上面这个字符串
+        // 业务 JSON（就是 data 字段里的“原始 JSON”）
+        val bizJsonString = """
+            {
+              "deviceId": "$deviceId",
+              "deviceName": "智慧终端A1",
+              "appId": "X6AM8R3O675RBQEM",
+              "version": "1.0",
+              "publicIp": "112.45.90.12",
+              "cpuUsage": "20%",
+              "memoryUsage": "1.2GB/4GB",
+              "storageUsage": "32GB/64GB",
+              "remark": "测试设备 - 心跳正常"
+            }
+        """.trimIndent()
+
+        // 规范化 JSON
         val canonicalData = canonicalJson(bizJsonString)
 
+        // 拼接 signString（和拦截器一致）
         val signString = "appId=$appId" +
                 "&appSecret=$appSecret" +
                 "&data=$canonicalData" +
@@ -92,12 +111,24 @@ object SignUtils {
 
         val sign = hmacSha256Hex(signString, appSecret)
 
-        android.util.Log.d("SignTest", "signString = $signString")
-        android.util.Log.d("SignTest", "sign       = $sign")
+        // 实际请求体 JSON（发给接口的就是这个结构）
+        val requestJson = JSONObject().apply {
+            put("appId", appId)
+            put("deviceId", deviceId)
+            put("timestamp", timestamp)
+            put("nonce", nonce)
+            put("data", canonicalData) // 字符串
+            put("sign", sign)
+        }.toString()
+
+        android.util.Log.d("MqttSignTest", "bizJson       = $bizJsonString")
+        android.util.Log.d("MqttSignTest", "canonicalData = $canonicalData")
+        android.util.Log.d("MqttSignTest", "timestamp     = $timestamp")
+        android.util.Log.d("MqttSignTest", "nonce         = $nonce")
+        android.util.Log.d("MqttSignTest", "signString    = $signString")
+        android.util.Log.d("MqttSignTest", "sign          = $sign")
+        android.util.Log.d("MqttSignTest", "requestJson   = $requestJson")
 
         return sign
     }
-
-
-
 }

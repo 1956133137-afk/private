@@ -1,12 +1,18 @@
 package com.example.storechat.data.api
 
 object SignConfig {
-    // 跟后台约好的 appId / appSecret
-    const val APP_ID = "你的appId"
-    const val APP_SECRET = "你的appSecret"
 
-    // 简单写法：先写死一个设备号，后面你可以自己换成 ANDROID_ID / SN 等
+    // 用你提供的正式测试账号
+    const val APP_ID = "U5PPF18NU6XTBI1F"
+    const val APP_SECRET = "FnqAu70dJ5FzTeHQYLkFL8Nu2EqKQtMIUMVicJ3r0kajIcV8Bg"
+
+    /**
+     * 设备唯一标识：
+     * 现在先写死一个，方便你和后台查数据库、
+     * 后面真上生产再改成 AndroidID / SN / UUID 等。
+     */
     fun getDeviceId(): String {
-        return "demo-device-no" // TODO: 换成真实设备号
+        // 随便一个有格式的，保证唯一即可
+        return "DEV202501180001"
     }
 }

@@ -3,10 +3,7 @@ package com.example.storechat.data.api
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.VersionInfo
 import retrofit2.http.Body
-import retrofit2.http.GET
 import retrofit2.http.POST
-import retrofit2.http.Query
-
 
 /**
  * 后端接口定义占位，方便后续根据文档调整。
@@ -34,7 +31,43 @@ data class DownloadLinkRequest(
     val versionName: String? = null
 )
 
+/* ======================  这里开始是 MQTT 相关  ====================== */
 
+// MQTT 初始化请求的业务字段（会被拦截器包到 data 里）
+data class MqttInitBizBody(
+    val deviceId: String,
+    val deviceName: String? = null,
+    val appId: String? = null,
+    val version: String? = null,
+    val publicIp: String? = null,
+    val cpuUsage: String? = null,
+    val memoryUsage: String? = null,
+    val storageUsage: String? = null,
+    val remark: String? = null,
+)
+
+// 通用返回包装
+data class ApiWrapper<T>(
+    val msg: String,
+    val code: Int,
+    val data: T?
+)
+
+// MQTT 连接信息（按你给的返回示例来）
+data class MqttInfo(
+    val username: String,
+    val password: String,
+    val url: String,
+    val serverUrl: String,
+    val serverPort: String,
+    val topic: String,
+    val emqxHttpApiUrl: String,
+    val emqxHttpApiName: String,
+    val emqxHttpApiPassword: String,
+    val emqxHttpApiBaseUrl: String
+)
+
+/* ======================  Retrofit 接口定义  ====================== */
 
 interface AppApiService {
 
@@ -61,56 +94,10 @@ interface AppApiService {
     suspend fun getDownloadLink(
         @Body body: DownloadLinkRequest
     ): DownloadLinkResponse
+
+    // ⭐ 新增：获取 MQTT 连接信息（设备初始化）
+    @POST("openapi/iotDeviceData/getDeviceMQTTInfo")
+    suspend fun getMqttInfo(
+        @Body body: MqttInitBizBody
+    ): ApiWrapper<MqttInfo>
 }
-
-
- /**   // a. 应用列表接口：支持按分类查询
-    // 示例：/api/apps?category=1
-    @GET("api/apps")
-    suspend fun getAppList(
-        @Query("category") category: String
-    ): List<AppInfo>
-
-    // c. 应用历史版本列表接口
-    // 示例：/api/app/history?packageName=com.demo.app
-    @GET("api/app/history")
-    suspend fun getAppHistory(
-        @Query("packageName") packageName: String
-    ): List<VersionInfo>
-
-    // 检查更新（你后面如需接后端检查更新，可直接用这个）
-    @GET("api/app/check_update")
-    suspend fun checkUpdate(
-        @Query("packageName") packageName: String,
-        @Query("currentVer") version: String
-    ): VersionInfo?
-
-    // b. 下载链接获取接口：后台生成有效期下载链接
-    // 示例：/api/app/download_link?packageName=xxx&versionName=1.0.2
-    @GET("api/app/download_link")
-    suspend fun getDownloadLink(
-        @Query("packageName") packageName: String,
-        @Query("versionName") versionName: String? = null  // null 表示最新版本
-    ): DownloadLinkResponse
-}
-
-
-
-
-
-//interface AppApiService {
-//
-//    // 获取首页应用列表
-//    // 假设后端接口为 /api/apps?category=1
-//    @GET("api/apps")
-//    suspend fun getAppList(@Query("category") category: String): List<AppInfo>
-//
-//    // 获取指定应用的详情/历史版本
-//    @GET("api/app/history")
-//    suspend fun getAppHistory(@Query("packageName") packageName: String): List<VersionInfo>
-//
-//    // 检查更新
-//    @GET("api/app/check_update")
-//    suspend fun checkUpdate(@Query("packageName") packageName: String, @Query("currentVer") version: String): VersionInfo?
-//}
-**/

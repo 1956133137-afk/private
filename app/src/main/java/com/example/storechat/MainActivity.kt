@@ -23,6 +23,8 @@ class MainActivity : AppCompatActivity() , CustomAdapt{  //  实现 CustomAdapt
         val sign = SignUtils.testSign()
         Log.d("SignTest", "result = $sign")
 
+//        testMqttApi
+
         // Initialize XC Service Manager
         XcServiceManager.init(this)
 
