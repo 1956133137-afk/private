@@ -8,12 +8,22 @@ import retrofit2.converter.gson.GsonConverterFactory
 /**
  * Retrofit 客户端单例
  * 之后只需要在这里把 BASE_URL 改成你后台地址即可
+ * 
+ * 该对象负责创建和配置Retrofit实例，包括HTTP客户端、日志拦截器和签名拦截器
  */
 object ApiClient {
 
     // 换成测试环境域名，注意以 / 结尾
-    private const val BASE_URL = "https://test.yannuozhineng.com/acms/api/"
+    /**
+     * API基础URL地址
+     * 所有API端点都将基于此URL构建
+     */
+    private const val BASE_URL = "https://test.yannuozhineng.com/acms/"
 
+    /**
+     * 日志拦截器懒加载属性
+     * 用于记录HTTP请求和响应的详细信息
+     */
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {
         HttpLoggingInterceptor().apply {
             // 调试阶段打印请求/响应日志，方便排查问题
@@ -21,6 +31,10 @@ object ApiClient {
         }
     }
 
+    /**
+     * OkHttp客户端懒加载属性
+     * 配置了签名拦截器和日志拦截器
+     */
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             // 先加签，再打印日志，这样日志里能看到最终发送给服务器的完整 JSON
@@ -29,6 +43,10 @@ object ApiClient {
             .build()
     }
 
+    /**
+     * AppApiService实例懒加载属性
+     * 提供对所有API端点的访问
+     */
     val appApi: AppApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
