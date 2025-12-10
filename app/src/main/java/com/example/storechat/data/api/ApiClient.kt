@@ -37,7 +37,6 @@ object ApiClient {
      */
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            // 先加签，再打印日志，这样日志里能看到最终发送给服务器的完整 JSON
             .addInterceptor(SignInterceptor())
             .addInterceptor(loggingInterceptor)
             .build()

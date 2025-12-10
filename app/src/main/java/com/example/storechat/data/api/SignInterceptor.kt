@@ -2,7 +2,6 @@ package com.example.storechat.data.api
 
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okio.Buffer
@@ -17,31 +16,25 @@ class SignInterceptor : Interceptor {
 
     @Throws(IOException::class)
     override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
+        var request = chain.request()
 
-        val body: RequestBody? = originalRequest.body
-        val contentType = body?.contentType()
-        val isJson =
-            contentType != null &&
-                    contentType.type == "application" &&
-                    contentType.subtype == "json"
-
-        // 只处理 POST + JSON
-        if (originalRequest.method != "POST" || !isJson || body == null) {
-            return chain.proceed(originalRequest)
+        // 只处理 POST + JSON 请求
+        val body = request.body
+        if (request.method != "POST" || body == null || body.contentType()?.subtype != "json") {
+            return chain.proceed(request)
         }
 
-        // 1. 读出原始业务 JSON（接口真正的 body）
+        // 1. 读取原始请求体内容
         val buffer = Buffer()
         body.writeTo(buffer)
-        val dataString = buffer.readUtf8()   // 注意：直接作为 data
+        val dataString = buffer.readUtf8()
 
-        // 2. 生成签名相关字段
+        // 2. 准备签名所需参数
         val timestamp = SignUtils.generateTimestampMillis()
         val nonce = SignUtils.generateNonce()
         val deviceId = SignConfig.getDeviceId()
 
-        // 3. 按照后端约定拼接 signString（你已经和后端对过）
+        // 3. 严格按照服务器要求的固定顺序拼接参数，并将 appSecret 包含在内
         val signString = "appId=${SignConfig.APP_ID}" +
                 "&appSecret=${SignConfig.APP_SECRET}" +
                 "&data=$dataString" +
@@ -49,10 +42,11 @@ class SignInterceptor : Interceptor {
                 "&nonce=$nonce" +
                 "&timestamp=$timestamp"
 
+        // 4. 使用 appSecret 作为密钥进行 HmacSHA256 加密
         val sign = SignUtils.hmacSha256Hex(signString, SignConfig.APP_SECRET)
 
-        // 4. 包一层真正发送给后端的 JSON
-        val requestJson = JSONObject().apply {
+        // 5. 构建包含签名的新请求体 JSON
+        val newJsonBody = JSONObject().apply {
             put("appId", SignConfig.APP_ID)
             put("deviceId", deviceId)
             put("timestamp", timestamp)
@@ -61,16 +55,15 @@ class SignInterceptor : Interceptor {
             put("sign", sign)
         }
 
-        val mediaType = "application/json; charset=utf-8".toMediaType()
-        val newBody = requestJson.toString().toRequestBody(mediaType)
+        // 6. 创建新的 RequestBody
+        val newRequestBody = newJsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 
-        // 5. 自动加上 Device-Traced-Id 头
-        val traceId = UUID.randomUUID().toString()
-        val newRequest = originalRequest.newBuilder()
-            .header("Device-Traced-Id", traceId)
-            .post(newBody)
+        // 7. 用新的请求体和 Header 构建最终请求
+        request = request.newBuilder()
+            .header("Device-Traced-Id", UUID.randomUUID().toString())
+            .post(newRequestBody)
             .build()
 
-        return chain.proceed(newRequest)
+        return chain.proceed(request)
     }
 }

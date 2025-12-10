@@ -6,6 +6,7 @@ import androidx.lifecycle.MutableLiveData
 import com.example.storechat.data.api.ApiClient
 import com.example.storechat.data.api.AppHistoryRequest
 import com.example.storechat.data.api.AppListRequest
+import com.example.storechat.data.api.CheckUpdateRequest
 import com.example.storechat.data.api.DownloadLinkRequest
 import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
@@ -65,47 +66,6 @@ object AppRepository {
     }
 
     init {
-        val initialApps = listOf(
-            AppInfo(
-                name = "应用名称A", description = "应用简介说明...", size = "83MB",
-                downloadCount = 1002, packageName = "com.demo.appa",
-                apkPath = "/sdcard/apks/app_a.apk", installState = InstallState.INSTALLED_LATEST,
-                versionName = "1.0.3", releaseDate = "2025-11-12", category = AppCategory.YANNUO
-            ),
-            AppInfo(
-                name = "应用名称C", description = "应用简介说明...", size = "83MB",
-                downloadCount = 1002, packageName = "com.demo.appc",
-                apkPath = "/sdcard/apks/app_a_103.apk",
-                installState = InstallState.INSTALLED_OLD,
-                versionName = "1.0.4",
-                releaseDate = "2025-11-12",
-                category = AppCategory.YANNUO
-            ),
-            AppInfo(
-                name = "应用名称B", description = "应用简介说明...", size = "83MB",
-                downloadCount = 1003, packageName = "com.demo.appb",
-                apkPath = "/sdcard/apks/app_b.apk", installState = InstallState.INSTALLED_LATEST,
-                versionName = "1.0.1", releaseDate = "2025-10-20", category = AppCategory.YANNUO
-            ),
-            AppInfo(
-                name = "工行掌上银行", description = "工行官方移动银行客户端", size = "80MB",
-                downloadCount = 500000, packageName = "com.icbc.mobilebank",
-                apkPath = "/sdcard/apks/icbc_mobilebank.apk", installState = InstallState.NOT_INSTALLED,
-                versionName = "8.2.0.1.1", releaseDate = "2025-11-05", category = AppCategory.ICBC
-            ),
-            AppInfo(
-                name = "建行生活", description = "吃喝玩乐建行优惠", size = "70MB",
-                downloadCount = 300000, packageName = "com.ccb.life",
-                apkPath = "/sdcard/apks/ccb_life.apk", installState = InstallState.NOT_INSTALLED,
-                versionName = "3.2.1", releaseDate = "2025-11-08", category = AppCategory.CCB
-            )
-        )
-
-        synchronized(stateLock) {
-            localAllApps = initialApps
-            _allApps.postValue(localAllApps)
-        }
-
         coroutineScope.launch {
             refreshAppsFromServer(AppCategory.YANNUO)
         }
@@ -113,6 +73,7 @@ object AppRepository {
 
     private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
         synchronized(stateLock) {
+            // Use packageName (which is now appId) as the key
             val app = localAllApps.find { it.packageName == packageName } ?: return
             val newApp = transform(app)
 
@@ -161,45 +122,46 @@ object AppRepository {
 
     private suspend fun refreshAppsFromServer(category: AppCategory) {
         try {
-            val categoryParam = when (category) {
-                AppCategory.YANNUO -> "1"
-                AppCategory.ICBC -> "2"
-                AppCategory.CCB -> "3"
-            }
-            val remoteList = apiService.getAppList(
-                AppListRequest(category = categoryParam)
+            val response = apiService.getAppList(
+                AppListRequest(appId = null, appCategory = category.id)
             )
 
-            synchronized(stateLock) {
-                // Create a map of existing apps for quick lookup.
-                val localAppsMap = localAllApps.associateBy { it.packageName }
+            if (response.code == 200) {
+                val remoteList = response.data
+                synchronized(stateLock) {
+                    val localAppsMap = localAllApps.associateBy { it.appId }
 
-                // Merge the server list with the local state.
-                val mergedRemoteList = remoteList.map { serverApp ->
-                    val localApp = localAppsMap[serverApp.packageName]
-                    if (localApp != null) {
-                        // App exists locally. Trust the server for metadata (name, icon, etc.),
-                        // but preserve the local download/install state.
-                        serverApp.copy(
-                            installState = localApp.installState,
-                            downloadStatus = localApp.downloadStatus,
-                            progress = localApp.progress
+                    val mergedRemoteList = remoteList.map { serverApp ->
+                        val localApp = localAppsMap[serverApp.appId]
+                        val newAppInfo = AppInfo(
+                                name = serverApp.productName,
+                                appId = serverApp.appId,
+                                category = AppCategory.from(serverApp.appCategory) ?: AppCategory.YANNUO,
+                                createTime = serverApp.createTime,
+                                updateTime = serverApp.updateTime,
+                                remark = serverApp.remark,
+                                description = serverApp.remark ?: "", // Use remark as description
+                                size = "N/A", // Placeholder
+                                downloadCount = 0, // Placeholder
+                                packageName = serverApp.appId, // Use appId as a temporary substitute for packageName
+                                apkPath = "", // Placeholder, critical for install
+                                installState = localApp?.installState ?: InstallState.NOT_INSTALLED,
+                                versionName = "1.0.0", // Placeholder
+                                releaseDate = serverApp.createTime, // Use createTime as releaseDate
+                                downloadStatus = localApp?.downloadStatus ?: DownloadStatus.NONE,
+                                progress = localApp?.progress ?: 0
                         )
-                    } else {
-                        // This is a new app from the server that we haven't seen before.
-                        serverApp
+                        newAppInfo
                     }
+
+                    val otherCategoryApps = localAllApps.filter { it.category != category }
+                    localAllApps = otherCategoryApps + mergedRemoteList
+                    _allApps.postValue(localAllApps)
                 }
-
-                // Get all apps from other categories that we are not touching.
-                val otherCategoryApps = localAllApps.filter { it.category != category }
-
-                // The new source of truth is the combination of untouched apps and the newly merged list.
-                localAllApps = otherCategoryApps + mergedRemoteList
-                _allApps.postValue(localAllApps)
             }
         } catch (e: Exception) {
             // On network error or other issues, we keep the existing local data to be safe.
+            e.printStackTrace()
         }
     }
 
@@ -383,11 +345,27 @@ object AppRepository {
 
     fun checkAppUpdate() {
         coroutineScope.launch {
-            delay(800L)
-            val current = _appVersion.value?.removePrefix("V") ?: "1.0.0"
-            val latestFromServer = "1.0.1"
-            val status = if (latestFromServer == current) UpdateStatus.LATEST else UpdateStatus.NEW_VERSION(latestFromServer)
-            _checkUpdateResult.postValue(status)
+            try {
+                // NOTE: We are using a hardcoded appId for now. 
+                // This should be replaced with the actual app's ID.
+                val appId = "32DQY9LH260HX43U" 
+                val currentVersion = _appVersion.value?.removePrefix("V") ?: "1.0.0"
+                
+                val latestVersionInfo = apiService.checkUpdate(
+                    CheckUpdateRequest(
+                        packageName = appId, 
+                        currentVer = currentVersion
+                    )
+                )
+
+                if (latestVersionInfo != null && latestVersionInfo.versionName > currentVersion) {
+                    _checkUpdateResult.postValue(UpdateStatus.NEW_VERSION(latestVersionInfo.versionName))
+                } else {
+                    _checkUpdateResult.postValue(UpdateStatus.LATEST)
+                }
+            } catch (e: Exception) {
+                _checkUpdateResult.postValue(UpdateStatus.LATEST) // Fail silently
+            }
         }
     }
 
