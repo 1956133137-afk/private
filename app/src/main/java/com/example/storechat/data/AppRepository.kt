@@ -4,7 +4,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import com.example.storechat.data.api.ApiClient
-import com.example.storechat.data.api.AppHistoryRequest
+import com.example.storechat.data.api.AppVersionHistoryRequest
 import com.example.storechat.data.api.AppListRequest
 import com.example.storechat.data.api.CheckUpdateRequest
 import com.example.storechat.data.api.DownloadLinkRequest
@@ -296,31 +296,23 @@ object AppRepository {
 
     suspend fun loadHistoryVersions(app: AppInfo): List<HistoryVersion> {
         return try {
-            val versions = apiService.getAppHistory(
-                AppHistoryRequest(packageName = app.packageName)
+            val response = apiService.getAppHistory(
+                AppVersionHistoryRequest(appId = app.appId)
             )
-
-            if (versions.isNotEmpty()) {
-                versions.map {
+            if (response.code == 200 && response.data != null) {
+                response.data.map { versionItem ->
                     HistoryVersion(
-                        versionName = it.versionName,
-                        apkPath = it.apkPath
+                        versionName = versionItem.version, // Mapping from the new response field
+                        apkPath = versionItem.versionDesc ?: versionItem.remark ?: "" // Use description or remark as a placeholder for path
                     )
                 }
             } else {
-                buildFakeHistory(app)
+                emptyList()
             }
         } catch (e: Exception) {
-            buildFakeHistory(app)
+            e.printStackTrace()
+            emptyList()
         }
-    }
-
-    private fun buildFakeHistory(app: AppInfo): List<HistoryVersion> {
-        return listOf(
-            HistoryVersion("1.0.2", "/sdcard/apks/${app.packageName}_102.apk"),
-            HistoryVersion("1.0.1", "/sdcard/apks/${app.packageName}_101.apk"),
-            HistoryVersion("1.0.0", "/sdcard/apks/${app.packageName}_100.apk")
-        )
     }
 
     fun installHistoryVersion(packageName: String, historyVersion: HistoryVersion) {

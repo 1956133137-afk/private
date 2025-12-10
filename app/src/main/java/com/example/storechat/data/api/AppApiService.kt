@@ -13,10 +13,10 @@ interface AppApiService {
         @Body body: AppListRequest
     ): AppListResponse
 
-    @POST("app/history")
+    @POST("iotDeviceData/queryAppVersionList")
     suspend fun getAppHistory(
-        @Body body: AppHistoryRequest
-    ): List<VersionInfo>
+        @Body body: AppVersionHistoryRequest
+    ): AppVersionHistoryResponse
 
     @POST("iotDeviceData/queryAppVersionList")
     suspend fun checkUpdate(
@@ -38,8 +38,6 @@ data class DownloadLinkResponse(
     val url: String,
     val expireTime: Long? = null
 )
-
-data class AppHistoryRequest(val packageName: String)
 
 data class CheckUpdateRequest(
     @SerializedName("appId")
