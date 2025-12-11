@@ -2,6 +2,7 @@ package com.example.storechat.xc
 
 import android.content.Context
 import android.os.Environment
+import android.util.Log
 import android.widget.Toast
 import com.proembed.service.MyService
 import kotlinx.coroutines.*
@@ -90,48 +91,48 @@ object XcServiceManager {
      *
      * 注意：该方法会在 IO dispatcher 执行，支持协程取消（会抛出 CancellationException）。
      */
+
+
+    // 在 downloadAndInstall 内增加日志
     suspend fun downloadAndInstall(
         apkUrl: String,
         packageName: String,
         openAfter: Boolean,
         progressCallback: ((Int) -> Unit)? = null
     ): Boolean = withContext(Dispatchers.IO) {
+        val TAG = "XCSVC"
         try {
+            Log.d(TAG, "start download: apkUrl=$apkUrl pkg=$packageName openAfter=$openAfter")
             val client = OkHttpClient()
             val req = Request.Builder().url(apkUrl).get().build()
             val resp = client.newCall(req).execute()
             if (!resp.isSuccessful) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(appContext, "下载失败: HTTP ${resp.code}", Toast.LENGTH_SHORT).show()
-                }
+                Log.e(TAG, "download failed http=${resp.code}")
                 resp.close()
                 return@withContext false
             }
-
             val body = resp.body ?: run {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(appContext, "下载失败：响应体为空", Toast.LENGTH_SHORT).show()
-                }
+                Log.e(TAG, "download failed: body == null")
                 resp.close()
                 return@withContext false
             }
-
-            val contentLength = body.contentLength() // 可能为 -1
+            val contentLength = body.contentLength()
+            Log.d(TAG, "contentLength = $contentLength")
             val input: InputStream = body.byteStream()
 
-            // 目标文件：/Android/data/<package>/files/Download/<pkg>_timestamp.apk
             val downloadsDir: File? = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             val targetDir = downloadsDir ?: appContext.filesDir
             if (!targetDir.exists()) targetDir.mkdirs()
             val targetFile = File(targetDir, "${packageName}_${System.currentTimeMillis()}.apk")
 
+            Log.d(TAG, "writing to ${targetFile.absolutePath}")
             BufferedOutputStream(FileOutputStream(targetFile)).use { out ->
                 val buffer = ByteArray(8 * 1024)
                 var read: Int
                 var totalRead = 0L
                 while (true) {
-                    // 支持协程取消
                     if (!coroutineContext.isActive) {
+                        Log.w(TAG, "download cancelled by coroutineContext")
                         throw CancellationException("下载已取消")
                     }
                     read = input.read(buffer)
@@ -140,48 +141,42 @@ object XcServiceManager {
                     totalRead += read
                     if (contentLength > 0) {
                         val percent = ((totalRead * 100) / contentLength).toInt().coerceIn(0, 100)
-                        try {
-                            progressCallback?.invoke(percent)
-                        } catch (_: Exception) { /* 忽略回调异常 */ }
+                        Log.d(TAG, "progress: $percent% ($totalRead/$contentLength)")
+                        try { progressCallback?.invoke(percent) } catch (_: Exception) {}
                     } else {
-                        // contentLength 未知时，尝试发送 0/100 或根据已下载大小通知
-                        try {
-                            val approx = if (totalRead == 0L) 0 else 50
-                            progressCallback?.invoke(approx)
-                        } catch (_: Exception) {}
+                        // content-length unknown
+                        Log.d(TAG, "downloaded bytes: $totalRead (content-length unknown)")
+                        try { progressCallback?.invoke(50) } catch (_: Exception) {}
                     }
                 }
                 out.flush()
             }
             resp.close()
+            Log.d(TAG, "download complete: ${targetFile.absolutePath}")
 
-            // 下载完成，触发静默安装（MyService）
             val s = service
             if (s == null) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(appContext, "安装服务未就绪，请稍后", Toast.LENGTH_SHORT).show()
-                }
-                // 仍然返回 false，调用方可以选择重试
+                Log.e(TAG, "MyService is null, cannot install")
                 return@withContext false
             }
 
-            // 切到 IO 线程执行安装（silentInstallApk 本身可能是阻塞）
+            Log.d(TAG, "calling silentInstallApk on MyService: ${targetFile.absolutePath}")
             withContext(Dispatchers.IO) {
                 s.silentInstallApk(targetFile.absolutePath, packageName, openAfter)
             }
-
-            // 成功
+            Log.d(TAG, "silentInstallApk finished for $packageName")
             return@withContext true
+
         } catch (ce: CancellationException) {
-            // 下载被取消：删除未完成文件（如果存在）
-            // 注意：CancellationException 代表用户主动取消
+            Log.w("XCSVC", "download cancelled: ${ce.message}")
             return@withContext false
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("XCSVC", "download/install exception", e)
             withContext(Dispatchers.Main) {
                 Toast.makeText(appContext, "下载或安装发生异常: ${e.message}", Toast.LENGTH_SHORT).show()
             }
             return@withContext false
         }
     }
+
 }
