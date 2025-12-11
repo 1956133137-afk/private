@@ -9,7 +9,6 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import com.example.storechat.data.AppRepository
 import com.example.storechat.databinding.FragmentHistoryVersionBinding
-import com.example.storechat.xc.XcServiceManager
 
 /**
  * 显示“历史版本”的 Fragment
@@ -64,19 +63,12 @@ class HistoryVersionFragment : Fragment() {
             ).show()
 
             AppRepository.installHistoryVersion(
+                appId = currentApp.appId, // **FIXED: Pass the appId**
                 packageName = currentApp.packageName,
                 historyVersion = historyVersion
             )
         }
         binding.recyclerHistory.adapter = adapter
-
-//            XcServiceManager.installApk(
-//                apkPath = historyVersion.apkPath,
-//                packageName = currentApp.packageName,
-//                openAfter = true
-//            )
-//        }
-//        binding.recyclerHistory.adapter = adapter
     }
 
     private fun observeViewModel() {

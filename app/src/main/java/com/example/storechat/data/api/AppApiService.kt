@@ -5,7 +5,6 @@ import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
 import retrofit2.http.POST
 
-
 interface AppApiService {
 
     @POST("iotDeviceData/queryAppList")
@@ -23,10 +22,10 @@ interface AppApiService {
         @Body body: CheckUpdateRequest
     ): VersionInfo?
 
-    @POST("app/download_link")
+    @POST("iotDeviceData/appVersionDownload") // **MODIFIED: Endpoint updated**
     suspend fun getDownloadLink(
         @Body body: DownloadLinkRequest
-    ): DownloadLinkResponse
+    ): ApiWrapper<DownloadLinkData> // **MODIFIED: Response type updated**
 
     @POST("iotDeviceData/getDeviceMQTTInfo")
     suspend fun getMqttInfo(
@@ -34,17 +33,13 @@ interface AppApiService {
     ): ApiWrapper<MqttInfo>
 }
 
-/**
- * 应用列表接口的请求体
- */
+// --- Data Classes ---
+
 data class AppListRequestBody(
     val appId: String? = null,
     val appCategory: Int? = null
 )
 
-/**
- * 应用列表接口的响应数据项
- */
 data class AppInfoResponse(
     val productName: String,
     val appId: String,
@@ -59,9 +54,24 @@ data class AppInfoResponse(
     val remark: String?
 )
 
-data class DownloadLinkResponse(
-    val url: String,
-    val expireTime: Long? = null
+// **MODIFIED: Request body for download link**
+data class DownloadLinkRequest(
+    val appId: String,
+    val id: Long // This is the versionId
+)
+
+// **NEW: Response data for download link**
+data class DownloadLinkData(
+    val id: Long,
+    val appId: String,
+    val fileUrl: String,
+    val version: String,
+    val versionCode: String,
+    val versionDesc: String?,
+    val status: Int,
+    val createTime: String,
+    val updateTime: String,
+    val remark: String?
 )
 
 data class CheckUpdateRequest(
@@ -69,11 +79,6 @@ data class CheckUpdateRequest(
     val packageName: String,
     @SerializedName("version")
     val currentVer: String
-)
-
-data class DownloadLinkRequest(
-    val packageName: String,
-    val versionName: String? = null
 )
 
 data class MqttInitBizBody(

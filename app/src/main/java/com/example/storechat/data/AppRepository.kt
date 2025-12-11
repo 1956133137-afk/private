@@ -1,5 +1,6 @@
 package com.example.storechat.data
 
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
@@ -149,7 +150,7 @@ object AppRepository {
         return AppInfo(
             name = response.productName,
             appId = response.appId,
-            versionId = response.id?.toLong(), // **MODIFIED: Store the version ID**
+            versionId = response.id?.toLong(),
             category = AppCategory.from(response.appCategory) ?: AppCategory.YANNUO,
             createTime = response.createTime,
             updateTime = response.updateTime,
@@ -157,8 +158,8 @@ object AppRepository {
             description = response.versionDesc ?: "",
             size = "N/A", // Placeholder
             downloadCount = 0, // Placeholder
-            packageName = response.appId, // Use appId as a temporary substitute for packageName
-            apkPath = "", // Placeholder, critical for install
+            packageName = response.appId,
+            apkPath = "", // Placeholder
             installState = localApp?.installState ?: InstallState.NOT_INSTALLED,
             versionName = response.version ?: "N/A",
             releaseDate = response.updateTime ?: response.createTime,
@@ -167,25 +168,28 @@ object AppRepository {
         )
     }
 
-    private suspend fun resolveDownloadApkPath(
-        packageName: String,
-        fallbackApkPath: String,
-        versionName: String?
-    ): String {
+    private suspend fun resolveDownloadApkPath(appId: String, versionId: Long): String {
         return try {
-            val resp = apiService.getDownloadLink(
-                DownloadLinkRequest(
-                    packageName = packageName,
-                    versionName = versionName
-                )
-            )
-            if (resp.url.isBlank()) fallbackApkPath else resp.url
+            val response = apiService.getDownloadLink(DownloadLinkRequest(appId = appId, id = versionId))
+            if (response.code == 200 && response.data != null) {
+                response.data.fileUrl
+            } else {
+                Log.e("DOWNLOAD", "API error getting download link: ${response.msg}")
+                ""
+            }
         } catch (e: Exception) {
-            fallbackApkPath
+            Log.e("DOWNLOAD", "Failed to resolve download URL for versionId: $versionId", e)
+            ""
         }
     }
 
     fun toggleDownload(app: AppInfo) {
+        val versionId = app.versionId
+        if (versionId == null) {
+            Log.e("DOWNLOAD", "Cannot download ${app.name}, versionId is null.")
+            return
+        }
+
         when (app.downloadStatus) {
             DownloadStatus.DOWNLOADING -> {
                 downloadJobs[app.packageName]?.cancel()
@@ -200,11 +204,10 @@ object AppRepository {
 
                 val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
                     try {
-                        val realApkPath = resolveDownloadApkPath(
-                            packageName = app.packageName,
-                            fallbackApkPath = app.apkPath,
-                            versionName = app.versionName
-                        )
+                        val realApkPath = resolveDownloadApkPath(app.appId, versionId)
+                        if (realApkPath.isBlank()) {
+                            throw IllegalStateException("Download URL is blank for versionId $versionId")
+                        }
 
                         updateAppStatus(app.packageName) {
                             it.copy(downloadStatus = DownloadStatus.DOWNLOADING)
@@ -255,8 +258,9 @@ object AppRepository {
                                 }
                             }
                             downloadJobs.remove(packageName)
-                            throw e
+                            if (!wasDeletion) throw e
                         } else {
+                            Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
                             updateAppStatus(packageName) {
                                 it.copy(downloadStatus = DownloadStatus.PAUSED)
                             }
@@ -304,9 +308,9 @@ object AppRepository {
             if (response.code == 200 && response.data != null) {
                 response.data.map { versionItem ->
                     HistoryVersion(
-                        versionId = versionItem.id, // **MODIFIED: Store the version ID**
+                        versionId = versionItem.id,
                         versionName = versionItem.version,
-                        apkPath = versionItem.versionDesc ?: versionItem.remark ?: "" // Use description or remark as a placeholder for path
+                        apkPath = versionItem.versionDesc ?: versionItem.remark ?: ""
                     )
                 }
             } else {
@@ -318,14 +322,14 @@ object AppRepository {
         }
     }
 
-    fun installHistoryVersion(packageName: String, historyVersion: HistoryVersion) {
+    fun installHistoryVersion(appId: String, packageName: String, historyVersion: HistoryVersion) {
         coroutineScope.launch {
-            val realApkPath = resolveDownloadApkPath(
-                packageName = packageName,
-                fallbackApkPath = historyVersion.apkPath,
-                versionName = historyVersion.versionName
-            )
-            XcServiceManager.installApk(realApkPath, packageName, true)
+            val realApkPath = resolveDownloadApkPath(appId, historyVersion.versionId)
+            if (realApkPath.isNotBlank()) {
+                XcServiceManager.installApk(realApkPath, packageName, true)
+            } else {
+                Log.e("DOWNLOAD", "Could not install history version, download URL is blank.")
+            }
         }
     }
 
@@ -341,14 +345,12 @@ object AppRepository {
     fun checkAppUpdate() {
         coroutineScope.launch {
             try {
-                // NOTE: We are using a hardcoded appId for now. 
-                // This should be replaced with the actual app's ID.
-                val appId = "32DQY9LH260HX43U" 
+                val appId = "32DQY9LH260HX43U"
                 val currentVersion = _appVersion.value?.removePrefix("V") ?: "1.0.0"
-                
+
                 val latestVersionInfo = apiService.checkUpdate(
                     CheckUpdateRequest(
-                        packageName = appId, 
+                        packageName = appId,
                         currentVer = currentVersion
                     )
                 )
@@ -359,7 +361,7 @@ object AppRepository {
                     _checkUpdateResult.postValue(UpdateStatus.LATEST)
                 }
             } catch (e: Exception) {
-                _checkUpdateResult.postValue(UpdateStatus.LATEST) // Fail silently
+                _checkUpdateResult.postValue(UpdateStatus.LATEST)
             }
         }
     }
