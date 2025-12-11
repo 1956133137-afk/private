@@ -45,6 +45,12 @@ class HomeFragment : Fragment() {
 
         setupViews()
         observeViewModel()
+
+        // Manually trigger initial data load
+        if (savedInstanceState == null) {
+            val initialCategory = AppCategory.values()[binding.tabLayoutCategories.selectedTabPosition]
+            viewModel.selectCategory(initialCategory)
+        }
     }
 
     override fun onResume() {

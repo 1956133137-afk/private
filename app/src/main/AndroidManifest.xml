@@ -41,10 +41,6 @@
             android:value="true" />
 
 
-<!--        MQTT服务声明-->
-        <service android:name="org.eclipse.paho.android.service.MqttService" />
-
-
         <activity
             android:name=".MainActivity"
             android:exported="true">

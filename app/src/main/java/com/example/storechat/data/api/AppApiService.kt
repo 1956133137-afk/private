@@ -26,11 +26,6 @@ interface AppApiService {
     suspend fun getDownloadLink(
         @Body body: DownloadLinkRequest
     ): ApiWrapper<DownloadLinkData> // **MODIFIED: Response type updated**
-
-    @POST("iotDeviceData/getDeviceMQTTInfo")
-    suspend fun getMqttInfo(
-        @Body body: MqttInitBizBody
-    ): ApiWrapper<MqttInfo>
 }
 
 // --- Data Classes ---
@@ -81,33 +76,8 @@ data class CheckUpdateRequest(
     val currentVer: String
 )
 
-data class MqttInitBizBody(
-    val deviceId: String,
-    val deviceName: String? = null,
-    val appId: String? = null,
-    val version: String? = null,
-    val publicIp: String? = null,
-    val cpuUsage: String? = null,
-    val memoryUsage: String? = null,
-    val storageUsage: String? = null,
-    val remark: String? = null,
-)
-
 data class ApiWrapper<T>(
     val msg: String,
     val code: Int,
     val data: T?
-)
-
-data class MqttInfo(
-    val username: String,
-    val password: String,
-    val url: String,
-    val serverUrl: String,
-    val serverPort: String,
-    val topic: String,
-    val emqxHttpApiUrl: String,
-    val emqxHttpApiName: String,
-    val emqxHttpApiPassword: String,
-    val emqxHttpApiBaseUrl: String
 )
