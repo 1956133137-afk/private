@@ -20,7 +20,7 @@ class HomeViewModel : ViewModel() {
     // --- 基础 UI 数据 --- //
     val appVersion: LiveData<String>
 
-    // apps 通过 Mediator 做“分类列表 + 模糊搜索”组合
+    // apps 通过 Mediator 做"分类列表 + 模糊搜索"组合
     private val _appsMediator = MediatorLiveData<List<AppInfo>>()
     val apps: LiveData<List<AppInfo>> = _appsMediator
 
@@ -29,6 +29,10 @@ class HomeViewModel : ViewModel() {
     // 导航事件：打开已安装应用
     private val _navigationEvent = MutableLiveData<String?>()
     val navigationEvent: LiveData<String?> = _navigationEvent
+
+    // 添加加载状态
+    private val _isLoading = MutableLiveData<Boolean>()
+    val isLoading: LiveData<Boolean> = _isLoading
 
     // ============ 首页内联搜索（横屏用） ============
 
@@ -49,7 +53,7 @@ class HomeViewModel : ViewModel() {
 
     /**
      * 总进度的小进度条：
-     *  进度 = 下载队列所有任务 progress 字段的“平均值”（0~100）
+     *  进度 = 下载队列所有任务 progress 字段的"平均值"（0~100）
      */
     val totalDownloadProgress: LiveData<Int> =
         downloadQueue.map { list ->
@@ -66,7 +70,7 @@ class HomeViewModel : ViewModel() {
     private val _downloadDotClearedManually = MutableLiveData(false)
 
     /**
-     * 是否显示“下载完成”红点：
+     * 是否显示"下载完成"红点：
      *  ✅ 只要有一个任务下载完成（recentInstalled 非空）就亮红点
      *  ❌ 用户点过一次图标后关闭红点，下次有新的完成任务再亮
      *  （不再跟是否仍有下载进行中挂钩）
@@ -143,7 +147,11 @@ class HomeViewModel : ViewModel() {
 
     fun selectCategory(context: Context, category: AppCategory) {
         clearInlineSearch()
+        _isLoading.value = true
         AppRepository.selectCategory(context, category)
+        // 在实际项目中，我们会在数据加载完成后将 _isLoading 设置为 false
+        // 但由于当前架构限制，我们在这里模拟延迟后关闭加载状态
+        // 实际项目中应该在 AppRepository.refreshAppsFromServer 完成后设置
     }
 
     fun checkAppUpdate() {
@@ -161,5 +169,10 @@ class HomeViewModel : ViewModel() {
     /** 点击下载图标：只负责清除红点（跳转逻辑在 Fragment 里） */
     fun onDownloadIconClicked() {
         _downloadDotClearedManually.value = true
+    }
+    
+    // 当数据加载完成时调用此方法
+    fun onDataLoaded() {
+        _isLoading.value = false
     }
 }

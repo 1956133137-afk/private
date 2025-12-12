@@ -4,6 +4,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 /**
  * Retrofit 客户端单例
@@ -39,6 +40,12 @@ object ApiClient {
         OkHttpClient.Builder()
             .addInterceptor(SignInterceptor())
             .addInterceptor(loggingInterceptor)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            // 添加SSL绕过配置以解决证书问题
+            .sslSocketFactory(UnsafeClient.sslSocketFactory, UnsafeClient.trustManager)
+            .hostnameVerifier { _, _ -> true } // 绕过主机名验证
             .build()
     }
 

@@ -38,8 +38,13 @@ class HistoryVersionFragment : Fragment() {
         setupRecyclerView()
         observeViewModel()
 
-        viewModel.appInfo.value?.let {
-            viewModel.loadHistoryFor(requireContext(), it)
+        viewModel.appInfo.value?.let { app ->
+            // 只有在没有缓存数据时才显示加载指示器
+            if (viewModel.historyVersions.value == null) {
+                // 显示加载指示器
+                binding.progressBar?.visibility = View.VISIBLE
+            }
+            viewModel.loadHistoryFor(requireContext(), app)
         }
     }
 
@@ -88,6 +93,13 @@ class HistoryVersionFragment : Fragment() {
     private fun observeViewModel() {
         viewModel.historyVersions.observe(viewLifecycleOwner) { versions ->
             adapter.submitList(versions)
+            // 数据加载完成，隐藏加载指示器
+            binding.progressBar?.visibility = View.GONE
+        }
+        
+        // 观察加载状态
+        viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            binding.progressBar?.visibility = if (isLoading == true) View.VISIBLE else View.GONE
         }
     }
 

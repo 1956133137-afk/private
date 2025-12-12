@@ -142,6 +142,8 @@ class HomeFragment : Fragment() {
     private fun observeViewModel() {
         viewModel.apps.observe(viewLifecycleOwner) { apps ->
             appListAdapter.submitList(apps)
+            // 数据加载完成，隐藏加载指示器
+            binding.progressBar?.visibility = View.GONE
         }
 
         viewModel.checkUpdateResult.observe(viewLifecycleOwner) { status ->
@@ -173,7 +175,7 @@ class HomeFragment : Fragment() {
 
         // ======= 下载图标 / 进度圈 / 红点联动 =======
 
-        // 1）是否有下载任务：只负责控制“进度圈”是否显示，不再动红点
+        // 1）是否有下载任务：只负责控制"进度圈"是否显示，不再动红点
         viewModel.isDownloadInProgress.observe(viewLifecycleOwner) { inProgress ->
             val progressCircle = binding.cpiDownloadProgress
             val downloadIcon = binding.ivDownloadManager
@@ -203,12 +205,19 @@ class HomeFragment : Fragment() {
                 View.GONE
             }
         }
+        
+        // 监听加载状态以显示/隐藏加载指示器
+        viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            binding.progressBar?.visibility = if (isLoading == true) View.VISIBLE else View.GONE
+        }
     }
     
     private fun refreshCurrentCategory() {
         val selectedTabPosition = binding.tabLayoutCategories.selectedTabPosition
         if (selectedTabPosition != TabLayout.Tab.INVALID_POSITION) {
             val category = AppCategory.values()[selectedTabPosition]
+            // 显示加载指示器
+            binding.progressBar?.visibility = View.VISIBLE
             viewModel.selectCategory(requireContext(), category)
         }
     }

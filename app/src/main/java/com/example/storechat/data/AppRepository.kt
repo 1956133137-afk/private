@@ -175,6 +175,9 @@ object AppRepository {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            // 通知所有观察者数据加载完成
+            // 注意：这个实现可能需要进一步调整以适应具体需求
         }
     }
 

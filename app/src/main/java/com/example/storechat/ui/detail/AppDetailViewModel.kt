@@ -22,6 +22,13 @@ class AppDetailViewModel : ViewModel() {
     private val _historyVersions = MutableLiveData<List<HistoryVersion>>()
     val historyVersions: LiveData<List<HistoryVersion>> = _historyVersions
 
+    // 添加加载状态
+    private val _isLoading = MutableLiveData<Boolean>()
+    val isLoading: LiveData<Boolean> = _isLoading
+
+    // 缓存历史版本数据
+    private val historyVersionCache = mutableMapOf<String, List<HistoryVersion>>()
+
     fun loadApp(packageName: String) {
         appInfoSource?.let { _appInfo.removeSource(it) }
 
@@ -42,9 +49,27 @@ class AppDetailViewModel : ViewModel() {
     }
 
     fun loadHistoryFor(context: Context, app: AppInfo) {
+        // 检查是否有缓存数据
+        if (historyVersionCache.containsKey(app.appId)) {
+            // 使用缓存数据
+            _historyVersions.value = historyVersionCache[app.appId]
+            return
+        }
+
+        // 没有缓存数据，发送网络请求
         viewModelScope.launch {
+            _isLoading.postValue(true)
             val history = AppRepository.loadHistoryVersions(context, app)
             _historyVersions.postValue(history)
+            _isLoading.postValue(false)
+            
+            // 缓存数据
+            historyVersionCache[app.appId] = history
         }
+    }
+    
+    // 清除缓存的方法（可根据需要调用）
+    fun clearHistoryCache() {
+        historyVersionCache.clear()
     }
 }
