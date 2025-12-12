@@ -9,16 +9,13 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import com.example.storechat.data.AppRepository
 import com.example.storechat.databinding.FragmentHistoryVersionBinding
+import com.example.storechat.model.AppInfo
 
-/**
- * 显示“历史版本”的 Fragment
- */
 class HistoryVersionFragment : Fragment() {
 
     private var _binding: FragmentHistoryVersionBinding? = null
     private val binding get() = _binding!!
 
-    // 与 AppDetailActivity 共享同一个 ViewModel 实例
     private val viewModel: AppDetailViewModel by activityViewModels()
 
     private lateinit var adapter: HistoryVersionAdapter
@@ -40,34 +37,40 @@ class HistoryVersionFragment : Fragment() {
         setupRecyclerView()
         observeViewModel()
 
-        // 触发加载历史版本数据
         viewModel.appInfo.value?.let {
             viewModel.loadHistoryFor(it)
         }
     }
 
     private fun setupRecyclerView() {
-        adapter = HistoryVersionAdapter { historyVersion ->
-            val currentApp = viewModel.appInfo.value
-            if (currentApp == null) {
-                Toast.makeText(requireContext(), "应用信息不存在", Toast.LENGTH_SHORT).show()
-                return@HistoryVersionAdapter
+        adapter = HistoryVersionAdapter(
+            onInstallClick = { historyVersion ->
+                val currentApp = viewModel.appInfo.value
+                if (currentApp == null) {
+                    Toast.makeText(requireContext(), "应用信息不存在", Toast.LENGTH_SHORT).show()
+                    return@HistoryVersionAdapter
+                }
+                Toast.makeText(requireContext(), "开始安装：${historyVersion.versionName}", Toast.LENGTH_SHORT).show()
+                AppRepository.installHistoryVersion(
+                    app = currentApp,
+                    historyVersion = historyVersion
+                )
+            },
+            onItemClick = { historyVersion ->
+                val currentApp = viewModel.appInfo.value
+                if (currentApp == null) {
+                    Toast.makeText(requireContext(), "应用信息不存在", Toast.LENGTH_SHORT).show()
+                    return@HistoryVersionAdapter
+                }
+                // Create a temporary AppInfo for the specific historical version
+                val historyAppInfo = currentApp.copy(
+                    versionId = historyVersion.versionId,
+                    versionName = historyVersion.versionName,
+                    description = historyVersion.apkPath // Assuming apkPath holds description
+                )
+                AppDetailActivity.startWithAppInfo(requireContext(), historyAppInfo)
             }
-
-            // 点击“安装”按钮，直接调用安装服务
-            // 内部会先根据下载链接接口生成有效期 URL，再调用静默安装服务
-            Toast.makeText(
-                requireContext(),
-                "开始安装：${historyVersion.versionName}",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            AppRepository.installHistoryVersion(
-                appId = currentApp.appId, // **FIXED: Pass the appId**
-                packageName = currentApp.packageName,
-                historyVersion = historyVersion
-            )
-        }
+        )
         binding.recyclerHistory.adapter = adapter
     }
 

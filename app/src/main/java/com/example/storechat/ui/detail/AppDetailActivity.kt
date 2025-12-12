@@ -31,13 +31,18 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
         binding.viewModel = viewModel
         binding.lifecycleOwner = this
 
-        val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME)
-        if (packageName == null) {
-            finish()
-            return
-        }
+        val appInfo = intent.getSerializableExtra(EXTRA_APP_INFO) as? AppInfo
 
-        viewModel.loadApp(packageName)
+        if (appInfo != null) {
+            viewModel.setAppInfo(appInfo)
+        } else {
+            val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME)
+            if (packageName == null) {
+                finish()
+                return
+            }
+            viewModel.loadApp(packageName)
+        }
 
         setupViews()
         setupViewPagerAndTabs()
@@ -90,10 +95,17 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
 
     companion object {
         private const val EXTRA_PACKAGE_NAME = "extra_package_name"
+        private const val EXTRA_APP_INFO = "extra_app_info"
 
         fun start(context: Context, app: AppInfo) {
             val intent = Intent(context, AppDetailActivity::class.java)
             intent.putExtra(EXTRA_PACKAGE_NAME, app.packageName)
+            context.startActivity(intent)
+        }
+
+        fun startWithAppInfo(context: Context, appInfo: AppInfo) {
+            val intent = Intent(context, AppDetailActivity::class.java)
+            intent.putExtra(EXTRA_APP_INFO, appInfo)
             context.startActivity(intent)
         }
     }

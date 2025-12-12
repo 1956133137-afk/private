@@ -1,5 +1,6 @@
 package com.example.storechat.ui.home
 
+import android.content.Context
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
@@ -136,9 +137,9 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun selectCategory(category: AppCategory) {
+    fun selectCategory(context: Context, category: AppCategory) {
         clearInlineSearch()
-        AppRepository.selectCategory(category)
+        AppRepository.selectCategory(context, category)
     }
 
     fun checkAppUpdate() {

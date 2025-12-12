@@ -1,5 +1,6 @@
 package com.example.storechat.data
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
@@ -16,6 +17,7 @@ import com.example.storechat.model.DownloadStatus
 import com.example.storechat.model.HistoryVersion
 import com.example.storechat.model.InstallState
 import com.example.storechat.model.UpdateStatus
+import com.example.storechat.util.AppUtils
 import com.example.storechat.xc.XcServiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -67,25 +69,47 @@ object AppRepository {
         }
     }
 
-    init {
+    fun initialize(context: Context) {
         coroutineScope.launch {
-            refreshAppsFromServer(AppCategory.YANNUO)
+            refreshAppsFromServer(context, AppCategory.YANNUO)
         }
     }
 
     private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
         synchronized(stateLock) {
-            val app = localAllApps.find { it.packageName == packageName } ?: return
-            val newApp = transform(app)
+            var appToTransform: AppInfo? = null
+            var appExistsInAllApps = false
 
-            localAllApps = localAllApps.map { if (it.packageName == packageName) newApp else it }
+            // First, try to find the app in the main list
+            val initialApp = localAllApps.find { it.packageName == packageName }
+            if (initialApp != null) {
+                appToTransform = initialApp
+                appExistsInAllApps = true
+            } else {
+                // If not in main list, it might be a temporary app (e.g., history download)
+                // Look for it in the download queue
+                appToTransform = localDownloadQueue.find { it.packageName == packageName }
+            }
 
+            if (appToTransform == null) return
+
+            val newApp = transform(appToTransform)
+
+            // Update localAllApps if the app was found there
+            if (appExistsInAllApps) {
+                localAllApps = localAllApps.map { if (it.packageName == packageName) newApp else it }
+            }
+
+            // Always update the download queue
             if (localDownloadQueue.any { it.packageName == packageName }) {
                 localDownloadQueue = localDownloadQueue.map { if (it.packageName == packageName) newApp else it }
                 _downloadQueue.postValue(localDownloadQueue)
             }
 
-            _allApps.postValue(localAllApps)
+            // Post the updated main list
+            if (appExistsInAllApps) {
+                _allApps.postValue(localAllApps)
+            }
         }
     }
 
@@ -114,14 +138,14 @@ object AppRepository {
         }
     }
 
-    fun selectCategory(category: AppCategory) {
+    fun selectCategory(context: Context, category: AppCategory) {
         _selectedCategory.postValue(category)
         coroutineScope.launch {
-            refreshAppsFromServer(category)
+            refreshAppsFromServer(context, category)
         }
     }
 
-    private suspend fun refreshAppsFromServer(category: AppCategory?) {
+    private suspend fun refreshAppsFromServer(context: Context, category: AppCategory?) {
         try {
             val response = apiService.getAppList(
                 AppListRequestBody(appCategory = category?.id)
@@ -133,7 +157,17 @@ object AppRepository {
                     val localAppsMap = localAllApps.associateBy { it.appId }
 
                     val mergedRemoteList = remoteList.map { serverApp ->
-                        mapToAppInfo(serverApp, localAppsMap[serverApp.appId])
+                        val localApp = localAppsMap[serverApp.appId]
+                        val installedVersionCode = AppUtils.getInstalledVersionCode(context, serverApp.appId)
+                        val isInstalled = installedVersionCode != -1L
+
+                        val installState = when {
+                            !isInstalled -> InstallState.NOT_INSTALLED
+                            (serverApp.id?.toLong() ?: 0) > installedVersionCode -> InstallState.INSTALLED_OLD
+                            else -> InstallState.INSTALLED_LATEST
+                        }
+
+                        mapToAppInfo(serverApp, localApp).copy(installState = installState, isInstalled = isInstalled)
                     }
 
                     val otherCategoryApps = localAllApps.filter { it.category != category }
@@ -204,84 +238,59 @@ object AppRepository {
 
                 val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
                     try {
-                        // 1) 获取后端真实下载地址（fileUrl）
                         val realApkPath = resolveDownloadApkPath(app.appId, versionId)
                         if (realApkPath.isBlank()) {
                             throw IllegalStateException("Download URL is blank for versionId $versionId")
                         }
 
-                        // 2) 更新状态为 DOWNLOADING
                         updateAppStatus(app.packageName) {
                             it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
                         }
 
-                        // 3) 使用 XcServiceManager 下载并安装，期间回调进度更新 UI
-                        val downloadSuccess = XcServiceManager.downloadAndInstall(
-                            apkUrl = realApkPath,
-                            packageName = app.packageName,
-                            openAfter = true,
-                            progressCallback = { percent ->
-                                // 更新进度值到 AppInfo 中（0..100）
+                        val installedPackageName = XcServiceManager.downloadAndInstall(
+                            url = realApkPath,
+                            onProgress = { percent ->
                                 updateAppStatus(app.packageName) { current ->
                                     current.copy(progress = percent)
                                 }
                             }
                         )
 
-                        if (!downloadSuccess) {
+                        if (installedPackageName == null) {
                             throw IllegalStateException("Download or install failed for ${app.name}")
                         }
 
-                        // 4) 安装期间/完成的状态更新
-                        updateAppStatus(app.packageName) {
-                            it.copy(downloadStatus = DownloadStatus.NONE, progress = 0, installState = InstallState.INSTALLED_LATEST)
+                        val masterAppInfo = synchronized(stateLock) { localAllApps.find { it.packageName == app.packageName } }
+                        val latestVersionId = masterAppInfo?.versionId ?: app.versionId
+
+                        val newInstallState = if (app.versionId < latestVersionId) {
+                            InstallState.INSTALLED_OLD
+                        } else {
+                            InstallState.INSTALLED_LATEST
                         }
 
-                        // 5) 移除任务、从队列删掉并加入已安装列表
+                        updateAppStatus(app.packageName) {
+                            it.copy(downloadStatus = DownloadStatus.NONE, progress = 0, installState = newInstallState)
+                        }
+
                         downloadJobs.remove(app.packageName)
                         removeFromDownloadQueue(app.packageName)
-                        addToRecentInstalled(
-                            AppInfo(
-                                name = app.name,
-                                appId = app.appId,
-                                versionId = app.versionId,
-                                category = app.category,
-                                createTime = app.createTime,
-                                updateTime = app.updateTime,
-                                remark = app.remark,
-                                description = app.description,
-                                size = app.size,
-                                downloadCount = app.downloadCount,
-                                packageName = app.packageName,
-                                apkPath = "", // 本地路径若需要可在 XcServiceManager 中返回
-                                installState = InstallState.INSTALLED_LATEST,
-                                versionName = app.versionName,
-                                releaseDate = app.releaseDate,
-                                downloadStatus = DownloadStatus.NONE,
-                                progress = 0
-                            )
-                        )
+                        addToRecentInstalled(app.copy(installState = newInstallState))
 
                     } catch (e: kotlinx.coroutines.CancellationException) {
-                        // 取消：可能来自用户主动取消
                         val packageName = app.packageName
                         val wasDeletion = cancellationsForDeletion.remove(packageName)
 
-                        if (wasDeletion) {
-                            updateAppStatus(packageName) {
-                                it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
-                            }
-                        } else {
-                            updateAppStatus(packageName) {
-                                it.copy(downloadStatus = DownloadStatus.PAUSED)
-                            }
+                        val finalStatus = if (wasDeletion) DownloadStatus.NONE else DownloadStatus.PAUSED
+                        val finalProgress = if (wasDeletion) 0 else app.progress
+
+                        updateAppStatus(packageName) {
+                            it.copy(downloadStatus = finalStatus, progress = finalProgress)
                         }
                         downloadJobs.remove(app.packageName)
-                        // 若是非删除操作，向上抛出异常到调用方
                         if (!wasDeletion) throw e
 
                     } catch (e: Exception) {
-                        // 一般错误：记录日志并切换到 PAUSED
                         Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
                         updateAppStatus(app.packageName) {
                             it.copy(downloadStatus = DownloadStatus.PAUSED)
@@ -290,7 +299,6 @@ object AppRepository {
                     }
                 }
 
-                // 记录并启动下载任务
                 downloadJobs[app.packageName] = newJob
                 newJob.start()
             }
@@ -345,15 +353,16 @@ object AppRepository {
         }
     }
 
-    fun installHistoryVersion(appId: String, packageName: String, historyVersion: HistoryVersion) {
-        coroutineScope.launch {
-            val realApkPath = resolveDownloadApkPath(appId, historyVersion.versionId)
-            if (realApkPath.isNotBlank()) {
-                XcServiceManager.installApk(realApkPath, packageName, true)
-            } else {
-                Log.e("DOWNLOAD", "Could not install history version, download URL is blank.")
-            }
-        }
+    fun installHistoryVersion(app: AppInfo, historyVersion: HistoryVersion) {
+        // Create a temporary AppInfo for the specific historical version
+        val historyAppInfo = app.copy(
+            versionId = historyVersion.versionId,
+            versionName = historyVersion.versionName,
+            downloadStatus = DownloadStatus.NONE, // Reset status to allow download
+            progress = 0
+        )
+        // Use the unified download logic
+        toggleDownload(historyAppInfo)
     }
 
     fun resumeAllPausedDownloads() {

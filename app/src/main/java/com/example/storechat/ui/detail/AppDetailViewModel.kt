@@ -4,7 +4,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.switchMap
+import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import com.example.storechat.data.AppRepository
 import com.example.storechat.model.AppInfo
@@ -13,47 +13,37 @@ import kotlinx.coroutines.launch
 
 class AppDetailViewModel : ViewModel() {
 
-    private val _packageName = MutableLiveData<String>()
+    private val _appInfo = MediatorLiveData<AppInfo>()
+    val appInfo: LiveData<AppInfo> = _appInfo
 
-    val appInfo: LiveData<AppInfo> = _packageName.switchMap { packageName ->
-        val result = MediatorLiveData<AppInfo>()
-        result.addSource(AppRepository.allApps) { apps ->
-            apps.find { it.packageName == packageName }?.let { foundApp ->
-                if (result.value != foundApp) {
-                    result.value = foundApp
-                }
-            }
-        }
-        result
-    }
+    private var appInfoSource: LiveData<AppInfo?>? = null
 
-    // 历史版本列表
     private val _historyVersions = MutableLiveData<List<HistoryVersion>>()
     val historyVersions: LiveData<List<HistoryVersion>> = _historyVersions
 
     fun loadApp(packageName: String) {
-        if (_packageName.value != packageName) {
-            _packageName.value = packageName
+        appInfoSource?.let { _appInfo.removeSource(it) }
+
+        val newSource = AppRepository.allApps.map { apps ->
+            apps.find { it.packageName == packageName }
         }
+
+        _appInfo.addSource(newSource) { app ->
+            app?.let { _appInfo.value = it }
+        }
+        appInfoSource = newSource
     }
 
-    /**
-     * 加载指定应用的历史版本（目前使用假数据）
-     */
-    fun loadHistoryFor(app: AppInfo) {
+    fun setAppInfo(app: AppInfo) {
+        appInfoSource?.let { _appInfo.removeSource(it) }
+        appInfoSource = null
+        _appInfo.value = app
+    }
 
+    fun loadHistoryFor(app: AppInfo) {
         viewModelScope.launch {
             val history = AppRepository.loadHistoryVersions(app)
             _historyVersions.postValue(history)
         }
-
-
-        // 在真实项目中，这里应该从数据库或网络加载
-//        val fakeHistory = listOf(
-//            HistoryVersion("1.0.2", "/sdcard/apks/${app.packageName}_102.apk"),
-//            HistoryVersion("1.0.1", "/sdcard/apks/${app.packageName}_101.apk"),
-//            HistoryVersion("1.0.0", "/sdcard/apks/${app.packageName}_100.apk")
-//        )
-//        _historyVersions.value = fakeHistory
     }
 }

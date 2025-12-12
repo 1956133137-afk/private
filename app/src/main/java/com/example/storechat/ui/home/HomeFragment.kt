@@ -49,7 +49,7 @@ class HomeFragment : Fragment() {
         // Manually trigger initial data load
         if (savedInstanceState == null) {
             val initialCategory = AppCategory.values()[binding.tabLayoutCategories.selectedTabPosition]
-            viewModel.selectCategory(initialCategory)
+            viewModel.selectCategory(requireContext(), initialCategory)
         }
     }
 
@@ -81,7 +81,7 @@ class HomeFragment : Fragment() {
             TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 val category = AppCategory.values()[tab.position]
-                viewModel.selectCategory(category)
+                viewModel.selectCategory(requireContext(), category)
             }
             override fun onTabUnselected(tab: TabLayout.Tab) {}
             override fun onTabReselected(tab: TabLayout.Tab) {
@@ -209,7 +209,7 @@ class HomeFragment : Fragment() {
         val selectedTabPosition = binding.tabLayoutCategories.selectedTabPosition
         if (selectedTabPosition != TabLayout.Tab.INVALID_POSITION) {
             val category = AppCategory.values()[selectedTabPosition]
-            viewModel.selectCategory(category)
+            viewModel.selectCategory(requireContext(), category)
         }
     }
 

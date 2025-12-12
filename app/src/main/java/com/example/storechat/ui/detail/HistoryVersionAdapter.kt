@@ -9,13 +9,14 @@ import com.example.storechat.databinding.ItemVersionBinding
 import com.example.storechat.model.HistoryVersion
 
 class HistoryVersionAdapter(
-    private val onInstallClick: (HistoryVersion) -> Unit
+    private val onInstallClick: (HistoryVersion) -> Unit,
+    private val onItemClick: (HistoryVersion) -> Unit
 ) : ListAdapter<HistoryVersion, HistoryVersionAdapter.VersionViewHolder>(DiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VersionViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         val binding = ItemVersionBinding.inflate(inflater, parent, false)
-        return VersionViewHolder(binding, onInstallClick)
+        return VersionViewHolder(binding, onInstallClick, onItemClick)
     }
 
     override fun onBindViewHolder(holder: VersionViewHolder, position: Int) {
@@ -24,12 +25,14 @@ class HistoryVersionAdapter(
 
     class VersionViewHolder(
         private val binding: ItemVersionBinding,
-        private val onInstallClick: (HistoryVersion) -> Unit
+        private val onInstallClick: (HistoryVersion) -> Unit,
+        private val onItemClick: (HistoryVersion) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(item: HistoryVersion) {
             binding.version = item
             binding.btnInstall.setOnClickListener { onInstallClick(item) }
+            binding.root.setOnClickListener { onItemClick(item) } // Add this line
             binding.executePendingBindings()
         }
     }

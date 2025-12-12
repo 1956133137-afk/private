@@ -21,12 +21,24 @@ data class AppInfo(
     val downloadCount: Int,
     val packageName: String,
     val apkPath: String,
-    val installState: InstallState,
+    var installState: InstallState,
     val versionName: String,
     val releaseDate: String,
     val downloadStatus: DownloadStatus = DownloadStatus.NONE,
-    val progress: Int = 0
+    val progress: Int = 0,
+    var isInstalled: Boolean = false
 ) : Serializable {
+
+    init {
+        installState = if (!isInstalled) {
+            InstallState.NOT_INSTALLED
+        } else {
+            // 在这里，我们假设如果 isInstalled 为 true，
+            // 那么我们已经通过比较版本号确定了是旧版本还是最新版本
+            // 这个逻辑需要在使用 AppInfo 的地方进行处理
+            installState // 保留外部设置的 installState
+        }
+    }
 
     val buttonText: String
         get() = when (downloadStatus) {
