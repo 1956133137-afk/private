@@ -46,16 +46,15 @@ class HomeFragment : Fragment() {
         setupViews()
         observeViewModel()
 
-        // Manually trigger initial data load
         if (savedInstanceState == null) {
-            val initialCategory = AppCategory.values()[binding.tabLayoutCategories.selectedTabPosition]
+            val initialCategory =
+                AppCategory.values()[binding.tabLayoutCategories.selectedTabPosition]
             viewModel.selectCategory(requireContext(), initialCategory)
         }
     }
 
     override fun onResume() {
         super.onResume()
-        // 竖屏模式下，从其他页面返回时，刷新列表以更新状态
         if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
             refreshCurrentCategory()
         }
@@ -72,7 +71,6 @@ class HomeFragment : Fragment() {
             AppCategory.values().forEach { category ->
                 addTab(newTab().setText(category.title))
             }
-
             tabGravity = TabLayout.GRAVITY_FILL
             tabMode = TabLayout.MODE_SCROLLABLE
         }
@@ -83,9 +81,10 @@ class HomeFragment : Fragment() {
                 val category = AppCategory.values()[tab.position]
                 viewModel.selectCategory(requireContext(), category)
             }
+
             override fun onTabUnselected(tab: TabLayout.Tab) {}
             override fun onTabReselected(tab: TabLayout.Tab) {
-                 refreshCurrentCategory()
+                refreshCurrentCategory()
             }
         })
 
@@ -99,7 +98,6 @@ class HomeFragment : Fragment() {
                 false
             }
         }
-        // 添加点击输入框时恢复焦点，显示光标
         binding.etSearch?.setOnClickListener {
             binding.etSearch?.requestFocus()
         }
@@ -119,31 +117,21 @@ class HomeFragment : Fragment() {
         binding.tvVersion?.setOnClickListener { viewModel.checkAppUpdate() }
     }
 
-    /**
-     * 搜索：
-     *  - 横屏：在首页内联模糊查询（只刷新下方列表，不跳转）
-     *  - 竖屏：保持原行为，跳转 SearchActivity
-     */
     private fun performSearch() {
         val keyword = binding.etSearch?.text?.toString().orEmpty()
 
-        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE){
-//            横屏：直接在首页内联搜索
+        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             viewModel.inlineSearch(keyword)
-            // 清除 EditText 焦点，隐藏光标
             binding.etSearch?.clearFocus()
-        }else{
-//            竖屏：跳转到 SearchActivity
+        } else {
             SearchActivity.start(requireContext(), keyword)
         }
-
     }
 
     private fun observeViewModel() {
         viewModel.apps.observe(viewLifecycleOwner) { apps ->
             appListAdapter.submitList(apps)
-            // 数据加载完成，隐藏加载指示器
-            binding.progressBar?.visibility = View.GONE
+            // ✅ 不要在这里动 progressBar（否则无网络时也会被你强制关掉）
         }
 
         viewModel.checkUpdateResult.observe(viewLifecycleOwner) { status ->
@@ -173,9 +161,7 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // ======= 下载图标 / 进度圈 / 红点联动 =======
-
-        // 1）是否有下载任务：只负责控制"进度圈"是否显示，不再动红点
+        // 下载相关
         viewModel.isDownloadInProgress.observe(viewLifecycleOwner) { inProgress ->
             val progressCircle = binding.cpiDownloadProgress
             val downloadIcon = binding.ivDownloadManager
@@ -189,35 +175,28 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // 2）总进度：驱动圆形进度圈，让圆环慢慢包围图标
         viewModel.totalDownloadProgress.observe(viewLifecycleOwner) { progress ->
             val value = (progress ?: 0).coerceIn(0, 100)
-            // 这里用的是 Material 的 CircularProgressIndicator
             binding.cpiDownloadProgress?.setProgressCompat(value, true)
         }
 
-        // 3）下载完成红点：只看 downloadFinishedDotVisible
         viewModel.downloadFinishedDotVisible.observe(viewLifecycleOwner) { visible ->
             val redDot = binding.viewDownloadDot
-            redDot?.visibility = if (visible == true) {
-                View.VISIBLE
-            } else {
-                View.GONE
-            }
+            redDot?.visibility = if (visible == true) View.VISIBLE else View.GONE
         }
-        
-        // 监听加载状态以显示/隐藏加载指示器
+
+        // ✅ 唯一入口：只靠 isLoading 控制转圈
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            binding.progressBar?.visibility = if (isLoading == true) View.VISIBLE else View.GONE
+            binding.progressBar?.visibility =
+                if (isLoading == true) View.VISIBLE else View.GONE
         }
     }
-    
+
     private fun refreshCurrentCategory() {
         val selectedTabPosition = binding.tabLayoutCategories.selectedTabPosition
         if (selectedTabPosition != TabLayout.Tab.INVALID_POSITION) {
             val category = AppCategory.values()[selectedTabPosition]
-            // 显示加载指示器
-            binding.progressBar?.visibility = View.VISIBLE
+            // ✅ 不要手动 VISIBLE；selectCategory() 会置 isLoading=true
             viewModel.selectCategory(requireContext(), category)
         }
     }

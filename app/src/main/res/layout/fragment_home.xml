@@ -5,7 +5,6 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
-        <!-- 绑定的 ViewModel，用于提供数据和处理业务逻辑 -->
         <variable
             name="viewModel"
             type="com.example.storechat.ui.home.HomeViewModel" />
@@ -29,12 +28,10 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
 
-            <!-- 使用 ConstraintLayout 布局搜索条内部元素 -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- 左侧 Logo -->
                 <ImageView
                     android:id="@+id/ivLogo"
                     android:layout_width="23dp"
@@ -45,7 +42,6 @@
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent" />
 
-                <!-- 右侧下载区域：FrameLayout 叠加 进度圈 + 图标 + 红点 -->
                 <FrameLayout
                     android:id="@+id/layoutDownloadIcon"
                     android:layout_width="23dp"
@@ -54,7 +50,6 @@
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent">
 
-                    <!-- 圆形进度圈：有下载任务时显示，用进度包围图标 -->
                     <com.google.android.material.progressindicator.CircularProgressIndicator
                         android:id="@+id/cpiDownloadProgress"
                         android:layout_width="match_parent"
@@ -66,7 +61,6 @@
                         app:indicatorInset="0dp"
                         android:visibility="gone" />
 
-                    <!-- 中间的下载图标（id 保持原样，用来点击跳转下载页） -->
                     <ImageView
                         android:id="@+id/ivDownloadManager"
                         android:layout_width="17dp"
@@ -75,7 +69,6 @@
                         android:src="@drawable/ic_download"
                         android:contentDescription="@null" />
 
-                    <!-- 下载完成提示小红点 -->
                     <View
                         android:id="@+id/viewDownloadDot"
                         android:layout_width="6dp"
@@ -85,7 +78,6 @@
                         android:visibility="gone" />
                 </FrameLayout>
 
-                <!-- 中间搜索块 -->
                 <ImageView
                     android:id="@+id/ivSearch"
                     android:layout_width="0dp"
@@ -145,17 +137,6 @@
                     app:tabSelectedTextColor="@color/black"
                     app:tabTextColor="@color/text_secondary" />
 
-                <!-- 加载指示器 -->
-                <ProgressBar
-                    android:id="@+id/progressBar"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:visibility="gone"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent" />
-
                 <!-- 应用列表 -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerAppList"
@@ -169,11 +150,21 @@
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintHorizontal_bias="0.0"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/tabLayoutCategories"
-                    app:layout_constraintVertical_bias="1.0"
                     tools:listitem="@layout/item_app" />
+
+                <!-- ✅ 加载指示器：放到 RecyclerView 后面，保证在最上层 -->
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:elevation="8dp"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
         </com.google.android.material.card.MaterialCardView>

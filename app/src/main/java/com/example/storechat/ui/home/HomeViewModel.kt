@@ -30,8 +30,8 @@ class HomeViewModel : ViewModel() {
     private val _navigationEvent = MutableLiveData<String?>()
     val navigationEvent: LiveData<String?> = _navigationEvent
 
-    // 添加加载状态
-    private val _isLoading = MutableLiveData<Boolean>()
+    // ✅ 加载状态：默认 true（进入首页先转圈）
+    private val _isLoading = MutableLiveData(true)
     val isLoading: LiveData<Boolean> = _isLoading
 
     // ============ 首页内联搜索（横屏用） ============
@@ -60,7 +60,6 @@ class HomeViewModel : ViewModel() {
             if (list.isNullOrEmpty()) {
                 0
             } else {
-                // 所有任务的进度求平均
                 val sum = list.sumOf { it.progress.coerceIn(0, 100) }
                 sum / list.size
             }
@@ -73,7 +72,6 @@ class HomeViewModel : ViewModel() {
      * 是否显示"下载完成"红点：
      *  ✅ 只要有一个任务下载完成（recentInstalled 非空）就亮红点
      *  ❌ 用户点过一次图标后关闭红点，下次有新的完成任务再亮
-     *  （不再跟是否仍有下载进行中挂钩）
      */
     val downloadFinishedDotVisible: LiveData<Boolean> =
         object : MediatorLiveData<Boolean>() {
@@ -84,12 +82,10 @@ class HomeViewModel : ViewModel() {
                     value = hasRecent && !cleared
                 }
 
-                // 有新的安装完成：允许红点重新出现
                 addSource(recentInstalled) {
                     _downloadDotClearedManually.value = false
                     update()
                 }
-                // 下载状态变化时也触发一次刷新（虽然不参与判断）
                 addSource(isDownloadInProgress) { update() }
                 addSource(_downloadDotClearedManually) { update() }
             }
@@ -103,7 +99,14 @@ class HomeViewModel : ViewModel() {
         _appsMediator.addSource(AppRepository.categorizedApps) { list ->
             val kw = _searchKeyword.value.orEmpty()
             _appsMediator.value = filterApps(list, kw)
+
+            // ✅ 只有“正确数据”才关闭转圈（这里按：非空列表）
+            if (!list.isNullOrEmpty()) {
+                _isLoading.value = false
+            }
+            // ❌ list 为空 / 网络失败：不做任何事 -> 一直保持 loading=true
         }
+
         _appsMediator.addSource(_searchKeyword) { kw ->
             _appsMediator.value = filterApps(AppRepository.categorizedApps.value, kw)
         }
@@ -118,9 +121,6 @@ class HomeViewModel : ViewModel() {
 
         return list.filter { app ->
             app.name.contains(kw, ignoreCase = true)
-            // 如果想更模糊，可以加上包名/描述：
-            // || app.packageName.contains(kw, ignoreCase = true)
-            // || app.description.contains(kw, ignoreCase = true)
         }
     }
 
@@ -149,9 +149,8 @@ class HomeViewModel : ViewModel() {
         clearInlineSearch()
         _isLoading.value = true
         AppRepository.selectCategory(context, category)
-        // 在实际项目中，我们会在数据加载完成后将 _isLoading 设置为 false
-        // 但由于当前架构限制，我们在这里模拟延迟后关闭加载状态
-        // 实际项目中应该在 AppRepository.refreshAppsFromServer 完成后设置
+        // 注意：这里不要主动关 isLoading
+        // 只有 categorizedApps 返回“正确数据”（非空）时才会关
     }
 
     fun checkAppUpdate() {
@@ -170,8 +169,8 @@ class HomeViewModel : ViewModel() {
     fun onDownloadIconClicked() {
         _downloadDotClearedManually.value = true
     }
-    
-    // 当数据加载完成时调用此方法
+
+    // 如果你将来有“明确成功回调”，也可以在那时手动调用
     fun onDataLoaded() {
         _isLoading.value = false
     }
