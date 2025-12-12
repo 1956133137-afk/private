@@ -17,6 +17,7 @@ import com.example.storechat.model.DownloadStatus
 import com.example.storechat.model.HistoryVersion
 import com.example.storechat.model.InstallState
 import com.example.storechat.model.UpdateStatus
+import com.example.storechat.util.AppPackageNameCache
 import com.example.storechat.util.AppUtils
 import com.example.storechat.xc.XcServiceManager
 import kotlinx.coroutines.CoroutineScope
@@ -158,7 +159,8 @@ object AppRepository {
 
                     val mergedRemoteList = remoteList.map { serverApp ->
                         val localApp = localAppsMap[serverApp.appId]
-                        val installedVersionCode = AppUtils.getInstalledVersionCode(context, serverApp.appId)
+                        val realPackageName = AppPackageNameCache.getPackageName(serverApp.appId) ?: serverApp.appId
+                        val installedVersionCode = AppUtils.getInstalledVersionCode(context, realPackageName)
                         val isInstalled = installedVersionCode != -1L
 
                         val installState = when {
@@ -167,7 +169,7 @@ object AppRepository {
                             else -> InstallState.INSTALLED_LATEST
                         }
 
-                        mapToAppInfo(serverApp, localApp).copy(installState = installState, isInstalled = isInstalled)
+                        mapToAppInfo(serverApp, localApp).copy(packageName = realPackageName, installState = installState, isInstalled = isInstalled)
                     }
 
                     val otherCategoryApps = localAllApps.filter { it.category != category }
@@ -256,7 +258,9 @@ object AppRepository {
                             }
                         )
 
-                        if (installedPackageName == null) {
+                        if (installedPackageName != null) {
+                            AppPackageNameCache.savePackageName(app.appId, installedPackageName)
+                        } else {
                             throw IllegalStateException("Download or install failed for ${app.name}")
                         }
 
