@@ -12,9 +12,11 @@ import com.proembed.service.MyService
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.BufferedOutputStream
+import okhttp3.Response
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 
 object XcServiceManager {
     private const val TAG = "XcServiceManager"
@@ -22,7 +24,6 @@ object XcServiceManager {
     private lateinit var appContext: Context
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // FileProvider Authority
     private const val FILE_PROVIDER_AUTHORITY = "com.example.storechat.fileprovider"
 
     fun init(context: Context) {
@@ -39,101 +40,146 @@ object XcServiceManager {
         }
     }
 
-    /**
-     * Downloads an APK, then attempts a silent install. If the hardware service is unavailable,
-     * it falls back to the standard system package installer.
-     * @return String? The package name of the app if the process was initiated, or null on failure.
-     */
     suspend fun downloadAndInstall(
+        appId: String,
+        versionId: Long,
         url: String,
         onProgress: ((Int) -> Unit)?
     ): String? = withContext(Dispatchers.IO) {
         try {
-            // 1. Download the file
-            val file = downloadApk(url, onProgress) ?: return@withContext null
+            val file = downloadApkWithResume(appId, versionId, url, onProgress) ?: return@withContext null
 
-            // 2. Parse APK to get package name
             val pm = appContext.packageManager
             val info = pm.getPackageArchiveInfo(file.absolutePath, 0)
             val realPackageName = info?.packageName
 
             if (realPackageName.isNullOrBlank()) {
                 Log.e(TAG, "Failed to parse APK, cannot get package name.")
+                file.delete() // Clean up invalid APK
                 return@withContext null
             }
             Log.d(TAG, "APK parsed successfully. PackageName: $realPackageName")
 
-            // 3. Attempt installation
             if (service != null) {
-                // Hardware service available -> Silent install
                 Log.d(TAG, "Attempting silent install for $realPackageName...")
-                service?.silentInstallApk(file.absolutePath, realPackageName, false) // Changed to false
+                service?.silentInstallApk(file.absolutePath, realPackageName, false)
             } else {
-                // Hardware service unavailable -> Fallback to standard install
                 Log.d(TAG, "Hardware service not found. Using standard installer for $realPackageName...")
                 promptStandardInstall(file)
             }
 
-            // 4. Return package name to let the repository update the UI state
             return@withContext realPackageName
 
         } catch (e: Exception) {
             Log.e(TAG, "Download and install process failed.", e)
-            if (e is kotlinx.coroutines.CancellationException) throw e // Rethrow cancellation
+            if (e is kotlinx.coroutines.CancellationException) throw e
             return@withContext null
         }
     }
 
-    private suspend fun downloadApk(url: String, onProgress: ((Int) -> Unit)?): File? {
-        // 1. Prepare file path
-        val tempName = "update_${System.currentTimeMillis()}.apk"
+    private suspend fun downloadApkWithResume(
+        appId: String,
+        versionId: Long,
+        url: String,
+        onProgress: ((Int) -> Unit)?
+    ): File? {
+        val client = OkHttpClient()
+        val fileName = "${appId}_${versionId}.apk"
         val dir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: appContext.filesDir
         if (!dir.exists()) dir.mkdirs()
-        val file = File(dir, tempName)
-        if (file.exists()) file.delete()
+        val file = File(dir, fileName)
 
-        // 2. Download via OkHttp
-        val client = OkHttpClient()
-        val req = Request.Builder().url(url).build()
-        val resp = client.newCall(req).execute()
-        if (!resp.isSuccessful || resp.body == null) {
-            Log.e(TAG, "Download failed: Response unsuccessful or body is null.")
-            return null
+        val requestBuilder = Request.Builder().url(url)
+        var downloadedBytes = 0L
+        if (file.exists()) {
+            downloadedBytes = file.length()
+            Log.d(TAG, "[Resume] File exists with size: $downloadedBytes. Adding Range header.")
+            requestBuilder.addHeader("Range", "bytes=$downloadedBytes-")
         }
 
-        val body = resp.body!!
-        val total = body.contentLength()
-        val input = body.byteStream()
-        val output = BufferedOutputStream(FileOutputStream(file))
-        val buffer = ByteArray(8192)
-        var len: Int
-        var current = 0L
+        val request = requestBuilder.build()
+        var response: Response? = null
+        try {
+            response = client.newCall(request).execute()
+            Log.d(TAG, "[Resume] Server responded with code: ${response.code}")
 
-        while (input.read(buffer).also { len = it } != -1) {
-            if (!currentCoroutineContext().isActive) {
-                output.close()
-                input.close()
-                Log.d(TAG, "Download cancelled.")
+            val isResumable = response.code == 206 && response.header("Content-Range") != null
+
+            if (!response.isSuccessful && !isResumable) {
+                Log.e(TAG, "Download failed: Server returned unsuccessful code ${response.code}")
                 return null
             }
-            output.write(buffer, 0, len)
-            current += len
-            if (total > 0) {
-                val progress = ((current * 100) / total).toInt()
-                withContext(Dispatchers.Main) { onProgress?.invoke(progress) }
+            
+            if (file.exists() && downloadedBytes > 0 && !isResumable) {
+                Log.w(TAG, "[Resume] Server does not support resume (sent code ${response.code}). Restarting download.")
+                file.delete()
+                downloadedBytes = 0
+            }
+
+            val body = response.body ?: return null
+            val totalBytes = body.contentLength() + downloadedBytes
+            Log.d(TAG, "[Resume] Starting download. Append: ${downloadedBytes > 0 && isResumable}, Downloaded: $downloadedBytes, ContentLength: ${body.contentLength()}, Total: $totalBytes")
+
+            body.byteStream().use { inputStream ->
+                FileOutputStream(file, downloadedBytes > 0 && isResumable).use { outputStream ->
+                    var currentBytes = downloadedBytes
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        if (!currentCoroutineContext().isActive) {
+                            Log.d(TAG, "Download cancelled by coroutine.")
+                            return null
+                        }
+                        outputStream.write(buffer, 0, bytesRead)
+                        currentBytes += bytesRead
+                        if (totalBytes > 0) {
+                            val progress = ((currentBytes * 100) / totalBytes).toInt()
+                            withContext(Dispatchers.Main) { onProgress?.invoke(progress) }
+                        }
+                    }
+
+                    if (currentBytes < totalBytes && totalBytes > 0) {
+                        Log.e(TAG, "Download incomplete. Expected $totalBytes but got $currentBytes.")
+                        return null
+                    }
+                }
+            }
+
+            Log.d(TAG, "Download finished successfully: ${file.absolutePath}")
+            return file
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during download.", e)
+            return null
+        } finally {
+            response?.close()
+        }
+    }
+    
+    fun deleteDownloadedFile(appId: String, versionId: Long) {
+        scope.launch {
+            try {
+                val fileName = "${appId}_${versionId}.apk"
+                val dir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: appContext.filesDir
+                val file = File(dir, fileName)
+                if (file.exists()) {
+                    if (file.delete()) {
+                        Log.d(TAG, "Successfully deleted partially downloaded file: $fileName")
+                    } else {
+                        Log.e(TAG, "Failed to delete partially downloaded file: $fileName")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting downloaded file for $appId-$versionId", e)
             }
         }
-        output.flush()
-        output.close()
-        resp.close()
-        Log.d(TAG, "Download complete: ${file.absolutePath}")
-        return file
     }
 
     private suspend fun promptStandardInstall(apkFile: File) {
         withContext(Dispatchers.Main) {
             val intent = Intent(Intent.ACTION_VIEW)
-            val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 FileProvider.getUriForFile(appContext, FILE_PROVIDER_AUTHORITY, apkFile)
             } else {
                 Uri.fromFile(apkFile)

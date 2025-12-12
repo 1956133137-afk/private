@@ -7,49 +7,46 @@ import androidx.lifecycle.map
 import com.example.storechat.data.AppRepository
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.DownloadTask
-import com.example.storechat.model.DownloadStatus
 
 class DownloadQueueViewModel : ViewModel() {
 
-    // region Data for Landscape (Single Task) & backward compatibility
+    // region Data for Landscape (Single Task) - DEPRECATED but kept for compatibility
     val activeTask: LiveData<DownloadTask?> = AppRepository.downloadQueue.map { queue ->
-        queue.firstOrNull()?.let {
-            val sizeInMb = it.size.replace("MB", "").toFloatOrNull() ?: 0f
+        queue.firstOrNull()?.let { app ->
             DownloadTask(
-                id = 0, // Static ID for the single view
-                app = it,
-                progress = it.progress,
-                speed = "", // This should be calculated based on download progress
-                downloadedSize = "${(sizeInMb * it.progress / 100)}MB",
-                totalSize = it.size,
-                status = it.downloadStatus
+                id = 0,
+                app = app,
+                progress = app.progress,
+                speed = "",
+                downloadedSize = "",
+                totalSize = app.size,
+                status = app.downloadStatus
             )
         }
     }
-
+    
     fun onStatusClick() {
         activeTask.value?.let { AppRepository.toggleDownload(it.app) }
     }
 
+    @Deprecated("Use cancelDownload(task) instead")
     fun cancelDownload() {
         activeTask.value?.let {
-            AppRepository.cancelDownload(it.app)
             AppRepository.removeDownload(it.app)
         }
-        _toastMessage.value = "下载已取消"
+        _toastMessage.value = "下载已取消，文件已删除"
     }
     // endregion
 
     // region Data for Portrait (Multi Task)
     val downloadTasks: LiveData<List<DownloadTask>> = AppRepository.downloadQueue.map { queue ->
         queue.mapIndexed { index, app ->
-            val sizeInMb = app.size.replace("MB", "").toFloatOrNull() ?: 0f
             DownloadTask(
                 id = index.toLong(),
                 app = app,
                 progress = app.progress,
-                speed = "speed", // This should be calculated based on download progress
-                downloadedSize = "${(sizeInMb * app.progress / 100)}MB",
+                speed = "", 
+                downloadedSize = "",
                 totalSize = app.size,
                 status = app.downloadStatus
             )
@@ -61,9 +58,8 @@ class DownloadQueueViewModel : ViewModel() {
     }
 
     fun cancelDownload(task: DownloadTask) {
-        AppRepository.cancelDownload(task.app)
         AppRepository.removeDownload(task.app)
-        _toastMessage.value = "下载已取消"
+        _toastMessage.value = "下载已取消，文件已删除"
     }
     // endregion
 
@@ -73,10 +69,9 @@ class DownloadQueueViewModel : ViewModel() {
     private val _toastMessage = MutableLiveData<String?>()
     val toastMessage: LiveData<String?> = _toastMessage
 
-    /** 顶部「全部继续」按钮 */
     fun resumeAllPausedTasks() {
         AppRepository.resumeAllPausedDownloads()
-        _toastMessage.value = "已全部继续"
+        _toastMessage.value = "已恢复所有任务"
     }
 
     fun onToastMessageShown() {

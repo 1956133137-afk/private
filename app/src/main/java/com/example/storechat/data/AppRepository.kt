@@ -23,7 +23,6 @@ object AppRepository {
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val downloadJobs = ConcurrentHashMap<String, Job>()
-    private val cancellationsForDeletion = ConcurrentHashMap.newKeySet<String>()
 
     private val apiService = ApiClient.appApi
 
@@ -220,7 +219,7 @@ object AppRepository {
 
         when (app.downloadStatus) {
             DownloadStatus.DOWNLOADING -> {
-                downloadJobs[app.packageName]?.cancel()
+                cancelDownload(app) // This is a PAUSE operation
             }
 
             DownloadStatus.NONE, DownloadStatus.PAUSED -> {
@@ -242,6 +241,8 @@ object AppRepository {
                         }
 
                         val installedPackageName = XcServiceManager.downloadAndInstall(
+                            appId = app.appId,
+                            versionId = versionId,
                             url = realApkPath,
                             onProgress = { percent ->
                                 updateAppStatus(app.packageName) { current ->
@@ -275,17 +276,10 @@ object AppRepository {
                         removeFromDownloadQueue(app.packageName)
 
                     } catch (e: kotlinx.coroutines.CancellationException) {
-                        val packageName = app.packageName
-                        val wasDeletion = cancellationsForDeletion.remove(packageName)
-
-                        val finalStatus = if (wasDeletion) DownloadStatus.NONE else DownloadStatus.PAUSED
-                        val finalProgress = if (wasDeletion) 0 else app.progress
-
-                        updateAppStatus(packageName) {
-                            it.copy(downloadStatus = finalStatus, progress = finalProgress)
-                        }
+                        // This block is now only for job cancellations, not for pause logic
+                        Log.d("DOWNLOAD", "Job for ${app.packageName} was cancelled.")
+                        updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                         downloadJobs.remove(app.packageName)
-                        if (!wasDeletion) throw e
 
                     } catch (e: Exception) {
                         Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
@@ -327,7 +321,7 @@ object AppRepository {
             if (response.code == 200 && response.data != null) {
                 response.data.map { versionItem ->
                     val state = if (versionItem.versionCode.toLongOrNull() == installedVersionCode) {
-                        InstallState.INSTALLED_LATEST // Using LATEST as it means "this one is installed"
+                        InstallState.INSTALLED_LATEST
                     } else {
                         InstallState.NOT_INSTALLED
                     }
@@ -335,7 +329,7 @@ object AppRepository {
                     HistoryVersion(
                         versionId = versionItem.id,
                         versionName = versionItem.version,
-                        apkPath = "", // Not needed anymore
+                        apkPath = "",
                         installState = state
                     )
                 }
@@ -349,24 +343,21 @@ object AppRepository {
     }
 
     fun cancelDownload(app: AppInfo) {
-        val packageName = app.packageName
-        val job = downloadJobs[packageName]
-
-        removeFromDownloadQueue(packageName)
-
-        if (job != null) {
-            cancellationsForDeletion.add(packageName)
-            job.cancel()
-        } else {
-            updateAppStatus(packageName) {
-                it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
-            }
-            cancellationsForDeletion.remove(packageName)
-        }
+        val job = downloadJobs[app.packageName]
+        job?.cancel()
     }
 
     fun removeDownload(app: AppInfo) {
+        // 1. Cancel the running job
+        cancelDownload(app)
+        // 2. Remove from the queue UI
         removeFromDownloadQueue(app.packageName)
+        // 3. Delete the physical file
+        app.versionId?.let { XcServiceManager.deleteDownloadedFile(app.appId, it) }
+        // 4. Reset the status in the main list
+        updateAppStatus(app.packageName) {
+            it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
+        }
     }
 
     fun resumeAllPausedDownloads() {
