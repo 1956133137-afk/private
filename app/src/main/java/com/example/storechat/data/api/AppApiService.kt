@@ -22,14 +22,20 @@ interface AppApiService {
         @Body body: CheckUpdateRequest
     ): VersionInfo?
 
-    @POST("iotDeviceData/appVersionDownload") // **MODIFIED: Endpoint updated**
-    suspend fun getDownloadLink(
-        @Body body: DownloadLinkRequest
-    ): ApiWrapper<DownloadLinkData> // **MODIFIED: Response type updated**
+    @POST("iotDeviceData/appVersionDownload")
+    suspend fun getDownloadUrl(
+        @Body body: GetDownloadUrlRequest
+    ): ApiWrapper<DownloadLinkData>
 }
 
-// --- Data Classes ---
+// --- Wrapper --- //
+data class ApiWrapper<T>(
+    val msg: String,
+    val code: Int,
+    val data: T?
+)
 
+// --- App List --- //
 data class AppListRequestBody(
     val appId: String? = null,
     val appCategory: Int? = null
@@ -49,13 +55,12 @@ data class AppInfoResponse(
     val remark: String?
 )
 
-// **MODIFIED: Request body for download link**
-data class DownloadLinkRequest(
+// --- Download URL --- //
+data class GetDownloadUrlRequest(
     val appId: String,
-    val id: Long // This is the versionId
+    val id: Long
 )
 
-// **NEW: Response data for download link**
 data class DownloadLinkData(
     val id: Long,
     val appId: String,
@@ -69,15 +74,27 @@ data class DownloadLinkData(
     val remark: String?
 )
 
+// --- History Version --- //
+data class AppVersionHistoryRequest(
+    val appId: String
+)
+
+data class AppVersionHistoryResponse(
+    val code: Int,
+    val msg: String,
+    val data: List<HistoryVersionItem>?
+)
+
+data class HistoryVersionItem(
+    val id: Long,
+    val version: String,
+    val versionCode: String
+)
+
+// --- Check Update --- //
 data class CheckUpdateRequest(
     @SerializedName("appId")
     val packageName: String,
     @SerializedName("version")
     val currentVer: String
-)
-
-data class ApiWrapper<T>(
-    val msg: String,
-    val code: Int,
-    val data: T?
 )

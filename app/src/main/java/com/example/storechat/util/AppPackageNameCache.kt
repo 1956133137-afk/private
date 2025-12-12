@@ -4,18 +4,27 @@ import android.content.Context
 import android.content.SharedPreferences
 
 object AppPackageNameCache {
-    private const val PREFS_NAME = "app_package_name_cache"
-    private lateinit var prefs: SharedPreferences
+    private const val APP_ID_TO_PACKAGE_NAME = "app_id_to_package_name_prefs"
+    private const val NAME_TO_PACKAGE_NAME = "name_to_package_name_prefs"
+
+    private lateinit var appIdPrefs: SharedPreferences
+    private lateinit var namePrefs: SharedPreferences
 
     fun init(context: Context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        appIdPrefs = context.getSharedPreferences(APP_ID_TO_PACKAGE_NAME, Context.MODE_PRIVATE)
+        namePrefs = context.getSharedPreferences(NAME_TO_PACKAGE_NAME, Context.MODE_PRIVATE)
     }
 
-    fun savePackageName(appId: String, packageName: String) {
-        prefs.edit().putString(appId, packageName).apply()
+    fun saveMapping(appId: String, productName: String, packageName: String) {
+        appIdPrefs.edit().putString(appId, packageName).apply()
+        namePrefs.edit().putString(productName, packageName).apply()
     }
 
-    fun getPackageName(appId: String): String? {
-        return prefs.getString(appId, null)
+    fun getPackageNameByAppId(appId: String): String? {
+        return appIdPrefs.getString(appId, null)
+    }
+
+    fun getPackageNameByName(productName: String): String? {
+        return namePrefs.getString(productName, null)
     }
 }

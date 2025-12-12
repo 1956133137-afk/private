@@ -5,18 +5,8 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
-import com.example.storechat.data.api.ApiClient
-import com.example.storechat.data.api.AppInfoResponse
-import com.example.storechat.data.api.AppListRequestBody
-import com.example.storechat.data.api.AppVersionHistoryRequest
-import com.example.storechat.data.api.CheckUpdateRequest
-import com.example.storechat.data.api.DownloadLinkRequest
-import com.example.storechat.model.AppCategory
-import com.example.storechat.model.AppInfo
-import com.example.storechat.model.DownloadStatus
-import com.example.storechat.model.HistoryVersion
-import com.example.storechat.model.InstallState
-import com.example.storechat.model.UpdateStatus
+import com.example.storechat.data.api.*
+import com.example.storechat.model.*
 import com.example.storechat.util.AppPackageNameCache
 import com.example.storechat.util.AppUtils
 import com.example.storechat.xc.XcServiceManager
@@ -25,7 +15,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
@@ -81,14 +70,11 @@ object AppRepository {
             var appToTransform: AppInfo? = null
             var appExistsInAllApps = false
 
-            // First, try to find the app in the main list
             val initialApp = localAllApps.find { it.packageName == packageName }
             if (initialApp != null) {
                 appToTransform = initialApp
                 appExistsInAllApps = true
             } else {
-                // If not in main list, it might be a temporary app (e.g., history download)
-                // Look for it in the download queue
                 appToTransform = localDownloadQueue.find { it.packageName == packageName }
             }
 
@@ -96,18 +82,15 @@ object AppRepository {
 
             val newApp = transform(appToTransform)
 
-            // Update localAllApps if the app was found there
             if (appExistsInAllApps) {
                 localAllApps = localAllApps.map { if (it.packageName == packageName) newApp else it }
             }
 
-            // Always update the download queue
             if (localDownloadQueue.any { it.packageName == packageName }) {
                 localDownloadQueue = localDownloadQueue.map { if (it.packageName == packageName) newApp else it }
                 _downloadQueue.postValue(localDownloadQueue)
             }
 
-            // Post the updated main list
             if (appExistsInAllApps) {
                 _allApps.postValue(localAllApps)
             }
@@ -129,7 +112,7 @@ object AppRepository {
             _downloadQueue.postValue(localDownloadQueue)
         }
     }
-
+    
     private fun addToRecentInstalled(app: AppInfo) {
         synchronized(stateLock) {
             if (localRecentApps.none { it.packageName == app.packageName }) {
@@ -159,17 +142,26 @@ object AppRepository {
 
                     val mergedRemoteList = remoteList.map { serverApp ->
                         val localApp = localAppsMap[serverApp.appId]
-                        val realPackageName = AppPackageNameCache.getPackageName(serverApp.appId) ?: serverApp.appId
-                        val installedVersionCode = AppUtils.getInstalledVersionCode(context, realPackageName)
+
+                        var realPackageName = AppPackageNameCache.getPackageNameByAppId(serverApp.appId)
+                        if (realPackageName == null) {
+                            realPackageName = AppPackageNameCache.getPackageNameByName(serverApp.productName)
+                            if (realPackageName != null) {
+                                AppPackageNameCache.saveMapping(serverApp.appId, serverApp.productName, realPackageName)
+                            }
+                        }
+
+                        val finalPackageName = realPackageName ?: serverApp.appId
+                        val installedVersionCode = AppUtils.getInstalledVersionCode(context, finalPackageName)
                         val isInstalled = installedVersionCode != -1L
 
                         val installState = when {
                             !isInstalled -> InstallState.NOT_INSTALLED
-                            (serverApp.id?.toLong() ?: 0) > installedVersionCode -> InstallState.INSTALLED_OLD
+                            (serverApp.versionCode?.toLongOrNull() ?: 0L) > installedVersionCode -> InstallState.INSTALLED_OLD
                             else -> InstallState.INSTALLED_LATEST
                         }
 
-                        mapToAppInfo(serverApp, localApp).copy(packageName = realPackageName, installState = installState, isInstalled = isInstalled)
+                        mapToAppInfo(serverApp, localApp).copy(packageName = finalPackageName, installState = installState, isInstalled = isInstalled)
                     }
 
                     val otherCategoryApps = localAllApps.filter { it.category != category }
@@ -192,10 +184,10 @@ object AppRepository {
             updateTime = response.updateTime,
             remark = response.remark,
             description = response.versionDesc ?: "",
-            size = "N/A", // Placeholder
-            downloadCount = 0, // Placeholder
+            size = "N/A",
+            downloadCount = 0,
             packageName = response.appId,
-            apkPath = "", // Placeholder
+            apkPath = "",
             installState = localApp?.installState ?: InstallState.NOT_INSTALLED,
             versionName = response.version ?: "N/A",
             releaseDate = response.updateTime ?: response.createTime,
@@ -206,7 +198,7 @@ object AppRepository {
 
     private suspend fun resolveDownloadApkPath(appId: String, versionId: Long): String {
         return try {
-            val response = apiService.getDownloadLink(DownloadLinkRequest(appId = appId, id = versionId))
+            val response = apiService.getDownloadUrl(GetDownloadUrlRequest(appId = appId, id = versionId))
             if (response.code == 200 && response.data != null) {
                 response.data.fileUrl
             } else {
@@ -259,7 +251,7 @@ object AppRepository {
                         )
 
                         if (installedPackageName != null) {
-                            AppPackageNameCache.savePackageName(app.appId, installedPackageName)
+                            AppPackageNameCache.saveMapping(app.appId, app.name, installedPackageName)
                         } else {
                             throw IllegalStateException("Download or install failed for ${app.name}")
                         }
@@ -276,10 +268,11 @@ object AppRepository {
                         updateAppStatus(app.packageName) {
                             it.copy(downloadStatus = DownloadStatus.NONE, progress = 0, installState = newInstallState)
                         }
+                        
+                        addToRecentInstalled(app.copy(installState = newInstallState))
 
                         downloadJobs.remove(app.packageName)
                         removeFromDownloadQueue(app.packageName)
-                        addToRecentInstalled(app.copy(installState = newInstallState))
 
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         val packageName = app.packageName
@@ -313,6 +306,37 @@ object AppRepository {
         }
     }
 
+    fun installHistoryVersion(app: AppInfo, historyVersion: HistoryVersion) {
+        val historyAppInfo = app.copy(
+            versionId = historyVersion.versionId,
+            versionName = historyVersion.versionName,
+            downloadStatus = DownloadStatus.NONE,
+            progress = 0
+        )
+        toggleDownload(historyAppInfo)
+    }
+
+    suspend fun loadHistoryVersions(app: AppInfo): List<HistoryVersion> {
+        return try {
+            val response = apiService.getAppHistory(
+                AppVersionHistoryRequest(appId = app.appId)
+            )
+            if (response.code == 200 && response.data != null) {
+                response.data.map { versionItem ->
+                    HistoryVersion(
+                        versionId = versionItem.id,
+                        versionName = versionItem.version,
+                        apkPath = ""
+                    )
+                }
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
 
     fun cancelDownload(app: AppInfo) {
         val packageName = app.packageName
@@ -333,40 +357,6 @@ object AppRepository {
 
     fun removeDownload(app: AppInfo) {
         removeFromDownloadQueue(app.packageName)
-    }
-
-    suspend fun loadHistoryVersions(app: AppInfo): List<HistoryVersion> {
-        return try {
-            val response = apiService.getAppHistory(
-                AppVersionHistoryRequest(appId = app.appId)
-            )
-            if (response.code == 200 && response.data != null) {
-                response.data.map { versionItem ->
-                    HistoryVersion(
-                        versionId = versionItem.id,
-                        versionName = versionItem.version,
-                        apkPath = versionItem.versionDesc ?: versionItem.remark ?: ""
-                    )
-                }
-            } else {
-                emptyList()
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
-        }
-    }
-
-    fun installHistoryVersion(app: AppInfo, historyVersion: HistoryVersion) {
-        // Create a temporary AppInfo for the specific historical version
-        val historyAppInfo = app.copy(
-            versionId = historyVersion.versionId,
-            versionName = historyVersion.versionName,
-            downloadStatus = DownloadStatus.NONE, // Reset status to allow download
-            progress = 0
-        )
-        // Use the unified download logic
-        toggleDownload(historyAppInfo)
     }
 
     fun resumeAllPausedDownloads() {
