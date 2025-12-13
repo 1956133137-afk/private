@@ -1,7 +1,7 @@
 package com.example.storechat.ui.home
 
 import android.content.Context
-import android.util.Log
+import com.example.storechat.util.LogUtil
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
@@ -138,7 +138,7 @@ class HomeViewModel : ViewModel() {
 
     fun handleAppAction(app: AppInfo) {
         if (app.installState == InstallState.INSTALLED_LATEST) {
-            Log.d(TAG, "Attempting to open app. PackageName: ${app.packageName}")
+            LogUtil.d(TAG, "Attempting to open app. PackageName: ${app.packageName}")
             _navigationEvent.value = app.packageName
         } else {
             AppRepository.toggleDownload(app)

@@ -8,6 +8,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import com.example.storechat.data.AppRepository
 import com.example.storechat.ui.home.HomeFragment
 import com.example.storechat.util.AppPackageNameCache
+import com.example.storechat.util.LogUtil
 import com.example.storechat.xc.XcServiceManager
 import me.jessyan.autosize.internal.CustomAdapt
 
@@ -21,6 +22,9 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
 
         // Initialize App Package Name Cache
         AppPackageNameCache.init(applicationContext)
+
+        // Initialize Log Utility
+        LogUtil.init(applicationContext)
 
         // Initialize App Repository
         AppRepository.initialize(applicationContext)

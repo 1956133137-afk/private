@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
-import android.util.Log
+import com.example.storechat.util.LogUtil
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -73,7 +73,7 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         val clickListener: (view: View) -> Unit = {
             viewModel.appInfo.value?.let { currentAppInfo ->
                 if (currentAppInfo.installState == InstallState.INSTALLED_LATEST) {
-                    Log.d(TAG, "Attempting to open app. PackageName: ${currentAppInfo.packageName}")
+                    LogUtil.d(TAG, "Attempting to open app. PackageName: ${currentAppInfo.packageName}")
                     val intent = packageManager.getLaunchIntentForPackage(currentAppInfo.packageName)
                     if (intent != null) {
                         startActivity(intent)

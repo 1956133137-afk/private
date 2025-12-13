@@ -5,10 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.util.Log
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.proembed.service.MyService
+import com.example.storechat.util.LogUtil
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,10 +30,10 @@ object XcServiceManager {
             try {
                 if (service == null) {
                     service = MyService(appContext)
-                    Log.i(TAG, "Hardware service connected successfully.")
+                    LogUtil.i(TAG, "Hardware service connected successfully.")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Hardware service init error. Fallback to standard installer will be used.", e)
+                LogUtil.e(TAG, "Hardware service init error. Fallback to standard installer will be used.", e)
             }
         }
     }
@@ -52,24 +52,24 @@ object XcServiceManager {
             val realPackageName = info?.packageName
 
             if (realPackageName.isNullOrBlank()) {
-                Log.e(TAG, "Failed to parse APK, cannot get package name.")
+                LogUtil.e(TAG, "Failed to parse APK, cannot get package name.")
                 file.delete()
                 return@withContext null
             }
-            Log.d(TAG, "APK parsed successfully. PackageName: $realPackageName")
+            LogUtil.d(TAG, "APK parsed successfully. PackageName: $realPackageName")
 
             if (service != null) {
-                Log.d(TAG, "Attempting silent install for $realPackageName...")
+                LogUtil.d(TAG, "Attempting silent install for $realPackageName...")
                 service?.silentInstallApk(file.absolutePath, realPackageName, false)
             } else {
-                Log.d(TAG, "Hardware service not found. Using standard installer for $realPackageName...")
+                LogUtil.d(TAG, "Hardware service not found. Using standard installer for $realPackageName...")
                 promptStandardInstall(file)
             }
 
             return@withContext realPackageName
 
         } catch (e: Exception) {
-            Log.e(TAG, "Download and install process failed.", e)
+            LogUtil.e(TAG, "Download and install process failed.", e)
             if (e is CancellationException) throw e
             return@withContext null
         }
@@ -99,7 +99,7 @@ object XcServiceManager {
 
             if (allowRange && file.exists()) {
                 downloadedBytes = file.length()
-                Log.d(TAG, "[Resume] File exists with size: $downloadedBytes. Adding Range header.")
+                LogUtil.d(TAG, "[Resume] File exists with size: $downloadedBytes. Adding Range header.")
                 requestBuilder.addHeader("Range", "bytes=$downloadedBytes-")
             }
 
@@ -107,31 +107,31 @@ object XcServiceManager {
             var response: Response? = null
             try {
                 response = client.newCall(request).execute()
-                Log.d(TAG, "[Resume] Server responded with code: ${response.code}")
+                LogUtil.d(TAG, "[Resume] Server responded with code: ${response.code}")
 
                 // ✅ 416：Range 无效，交给外层做“删文件重试”
                 if (response.code == 416) {
-                    Log.w(TAG, "[Resume] Server returned 416. Range not satisfiable.")
+                    LogUtil.w(TAG, "[Resume] Server returned 416. Range not satisfiable.")
                     return null
                 }
 
                 val isResumable = response.code == 206 && response.header("Content-Range") != null
 
                 if (!response.isSuccessful && !isResumable) {
-                    Log.e(TAG, "Download failed: Server returned unsuccessful code ${response.code}")
+                    LogUtil.e(TAG, "Download failed: Server returned unsuccessful code ${response.code}")
                     return null
                 }
 
                 // 如果带了 Range 但服务器没给 206/Content-Range，说明不支持 resume：删文件重下（你原来就有这段）
                 if (file.exists() && downloadedBytes > 0 && !isResumable) {
-                    Log.w(TAG, "[Resume] Server does not support resume (sent code ${response.code}). Restarting download.")
+                    LogUtil.w(TAG, "[Resume] Server does not support resume (sent code ${response.code}). Restarting download.")
                     file.delete()
                     downloadedBytes = 0
                 }
 
                 val body = response.body ?: return null
                 val totalBytes = body.contentLength() + downloadedBytes
-                Log.d(
+                LogUtil.d(
                     TAG,
                     "[Resume] Starting download. Append: ${downloadedBytes > 0 && isResumable}, Downloaded: $downloadedBytes, ContentLength: ${body.contentLength()}, Total: $totalBytes"
                 )
@@ -144,7 +144,7 @@ object XcServiceManager {
 
                         while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                             if (!currentCoroutineContext().isActive) {
-                                Log.d(TAG, "Download cancelled by coroutine.")
+                                LogUtil.d(TAG, "Download cancelled by coroutine.")
                                 throw CancellationException("Cancelled by user")
                             }
                             outputStream.write(buffer, 0, bytesRead)
@@ -156,22 +156,22 @@ object XcServiceManager {
                         }
 
                         if (currentBytes < totalBytes && totalBytes > 0) {
-                            Log.e(TAG, "Download incomplete. Expected $totalBytes but got $currentBytes.")
+                            LogUtil.e(TAG, "Download incomplete. Expected $totalBytes but got $currentBytes.")
                             return null
                         }
                     }
                 }
 
-                Log.d(TAG, "Download finished successfully: ${file.absolutePath}")
+                LogUtil.d(TAG, "Download finished successfully: ${file.absolutePath}")
                 return file
 
             } catch (e: Exception) {
                 // ✅ 如果是取消，不要当失败，不要触发 retry
                 if (e is CancellationException) {
-                    Log.d(TAG, "Download cancelled (no retry).")
+                    LogUtil.d(TAG, "Download cancelled (no retry).")
                     throw e
                 }
-                Log.e(TAG, "Exception during download.", e)
+                LogUtil.e(TAG, "Exception during download.", e)
                 return null
             }
             finally {
@@ -185,7 +185,7 @@ object XcServiceManager {
 
         // 2) 如果失败且本地文件存在：很可能是 416 或不匹配，删掉重新下（不带 Range）
         if (file.exists()) {
-            Log.w(TAG, "[Resume] Retry: deleting local file and downloading from scratch.")
+            LogUtil.w(TAG, "[Resume] Retry: deleting local file and downloading from scratch.")
             file.delete()
         }
 
@@ -201,13 +201,13 @@ object XcServiceManager {
                 val file = File(dir, fileName)
                 if (file.exists()) {
                     if (file.delete()) {
-                        Log.d(TAG, "Successfully deleted partially downloaded file: $fileName")
+                        LogUtil.d(TAG, "Successfully deleted partially downloaded file: $fileName")
                     } else {
-                        Log.e(TAG, "Failed to delete partially downloaded file: $fileName")
+                        LogUtil.e(TAG, "Failed to delete partially downloaded file: $fileName")
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error deleting downloaded file for $appId-$versionId", e)
+                LogUtil.e(TAG, "Error deleting downloaded file for $appId-$versionId", e)
             }
         }
     }
@@ -227,7 +227,7 @@ object XcServiceManager {
             if (appContext.packageManager.resolveActivity(intent, 0) != null) {
                 appContext.startActivity(intent)
             } else {
-                Log.e(TAG, "No activity found to handle standard installation intent.")
+                LogUtil.e(TAG, "No activity found to handle standard installation intent.")
                 Toast.makeText(appContext, "无法打开安装器", Toast.LENGTH_SHORT).show()
             }
         }

@@ -1,7 +1,7 @@
 package com.example.storechat.data
 
 import android.content.Context
-import android.util.Log
+import com.example.storechat.util.LogUtil
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
@@ -374,11 +374,11 @@ object AppRepository {
             if (response.code == 200 && response.data != null) {
                 response.data.fileUrl
             } else {
-                Log.e(TAG, "API error getting download link: ${response.msg}")
+                LogUtil.e(TAG, "API error getting download link: ${response.msg}")
                 ""
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to resolve download URL for versionId: $versionId", e)
+            LogUtil.e(TAG, "Failed to resolve download URL for versionId: $versionId", e)
             ""
         }
     }
@@ -389,7 +389,7 @@ object AppRepository {
     fun toggleDownload(app: AppInfo) {
         val versionId = app.versionId
         if (versionId == null) {
-            Log.e(TAG, "Cannot download ${app.name}, versionId is null.")
+            LogUtil.e(TAG, "Cannot download ${app.name}, versionId is null.")
             return
         }
 
@@ -472,7 +472,7 @@ object AppRepository {
                 downloadJobs.remove(key)
 
             } catch (e: Exception) {
-                Log.e(TAG, "Download/Install failed for ${app.name}", e)
+                LogUtil.e(TAG, "Download/Install failed for ${app.name}", e)
                 updateAppStatus(app.packageName, versionId) {
                     it.copy(downloadStatus = DownloadStatus.PAUSED)
                 }
