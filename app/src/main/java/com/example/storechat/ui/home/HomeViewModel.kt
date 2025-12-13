@@ -30,7 +30,7 @@ class HomeViewModel : ViewModel() {
     private val _navigationEvent = MutableLiveData<String?>()
     val navigationEvent: LiveData<String?> = _navigationEvent
 
-    // ✅ 加载状态：默认 true（进入首页先转圈）
+    //  加载状态：默认 true（进入首页先转圈）
     private val _isLoading = MutableLiveData(true)
     val isLoading: LiveData<Boolean> = _isLoading
 
@@ -70,8 +70,8 @@ class HomeViewModel : ViewModel() {
 
     /**
      * 是否显示"下载完成"红点：
-     *  ✅ 只要有一个任务下载完成（recentInstalled 非空）就亮红点
-     *  ❌ 用户点过一次图标后关闭红点，下次有新的完成任务再亮
+     *   只要有一个任务下载完成（recentInstalled 非空）就亮红点
+     *   用户点过一次图标后关闭红点，下次有新的完成任务再亮
      */
     val downloadFinishedDotVisible: LiveData<Boolean> =
         object : MediatorLiveData<Boolean>() {
@@ -100,11 +100,11 @@ class HomeViewModel : ViewModel() {
             val kw = _searchKeyword.value.orEmpty()
             _appsMediator.value = filterApps(list, kw)
 
-            // ✅ 只有“正确数据”才关闭转圈（这里按：非空列表）
+            //  只有“正确数据”才关闭转圈（这里按：非空列表）
             if (!list.isNullOrEmpty()) {
                 _isLoading.value = false
             }
-            // ❌ list 为空 / 网络失败：不做任何事 -> 一直保持 loading=true
+            //  list 为空 / 网络失败：不做任何事 -> 一直保持 loading=true
         }
 
         _appsMediator.addSource(_searchKeyword) { kw ->
