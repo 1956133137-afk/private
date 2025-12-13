@@ -98,9 +98,7 @@ class DownloadQueueActivity : AppCompatActivity() {
         val isDownloadListEmpty = viewModel.downloadTasks.value.isNullOrEmpty()
         val isRecentListEmpty = viewModel.recentInstalled.value.isNullOrEmpty()
         binding.layoutEmpty?.isVisible = isDownloadListEmpty && isRecentListEmpty
-        
-        // 添加调试日志
-        android.util.Log.d("DownloadQueue", "isDownloadListEmpty=$isDownloadListEmpty, isRecentListEmpty=$isRecentListEmpty, layoutEmpty visibility=${binding.layoutEmpty?.isVisible}")
+//        android.util.Log.d("DownloadQueue", "isDownloadListEmpty=$isDownloadListEmpty, isRecentListEmpty=$isRecentListEmpty, layoutEmpty visibility=${binding.layoutEmpty?.isVisible}")
     }
 
     companion object {
