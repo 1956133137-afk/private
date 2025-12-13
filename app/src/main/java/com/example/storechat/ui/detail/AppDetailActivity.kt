@@ -36,7 +36,12 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         binding.viewModel = viewModel
         binding.lifecycleOwner = this
 
-        val appInfo = intent.getSerializableExtra(EXTRA_APP_INFO) as? AppInfo
+        val appInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent.getSerializableExtra(EXTRA_APP_INFO, AppInfo::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getSerializableExtra(EXTRA_APP_INFO) as? AppInfo
+        }
 
         if (appInfo != null) {
             // ✅ 历史版本详情：保持监听 repo 的状态变化

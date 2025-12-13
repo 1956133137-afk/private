@@ -13,7 +13,7 @@ data class AppInfo(
     val appId: String, // from server
     val versionId: Long?, // from server, the ID of the latest version
     val category: AppCategory, // from server
-    val createTime: String, // from server
+    val createTime: String?, // from server
     val updateTime: String?, // from server
     val remark: String?, // from server
     val description: String?,

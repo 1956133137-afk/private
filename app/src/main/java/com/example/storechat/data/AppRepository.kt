@@ -6,6 +6,9 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import com.example.storechat.data.api.*
+import com.example.storechat.data.db.AppDatabase
+import com.example.storechat.data.db.DownloadDao
+import com.example.storechat.data.db.DownloadEntity
 import com.example.storechat.model.*
 import com.example.storechat.util.AppPackageNameCache
 import com.example.storechat.util.AppUtils
@@ -17,18 +20,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 object AppRepository {
 
+    private const val TAG = "AppRepository"
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // ★ 数据库 DAO
+    private lateinit var downloadDao: DownloadDao
+
     /**
-     * ✅ 方案B：下载任务按 taskKey 管理
+     *  方案B：下载任务按 taskKey 管理
      * taskKey = "packageName@versionId"
      */
     private val downloadJobs = ConcurrentHashMap<String, Job>()
-
 
     private val refreshJobs = ConcurrentHashMap<Int, Job>()
     private val lastFetchAt = ConcurrentHashMap<Int, Long>()
@@ -74,7 +81,7 @@ object AppRepository {
     }
 
     // ----------------------------
-    // ✅ taskKey helpers
+    //  taskKey helpers
     // ----------------------------
 
     private fun taskKey(packageName: String, versionId: Long): String = "$packageName@$versionId"
@@ -85,7 +92,7 @@ object AppRepository {
     }
 
     // ----------------------------
-    // ✅ 状态更新（主列表按 packageName，队列按 taskKey）
+    //  状态更新（主列表按 packageName，队列按 taskKey）
     // ----------------------------
 
     private fun updateAppStatus(
@@ -115,10 +122,37 @@ object AppRepository {
             if (key != null && newQueueItem != null) {
                 localDownloadQueue = localDownloadQueue.map { if (taskKey(it) == key) newQueueItem else it }
                 queueChanged = true
+
+                // ★ 触发数据库保存
+                saveToDatabase(newQueueItem)
             }
 
             if (queueChanged) _downloadQueue.postValue(localDownloadQueue)
             if (allAppsChanged) _allApps.postValue(localAllApps)
+        }
+    }
+
+    /**
+     * ★ 新增：保存任务到数据库
+     */
+    private fun saveToDatabase(app: AppInfo) {
+        coroutineScope.launch {
+            val vid = app.versionId ?: return@launch
+            val key = taskKey(app.packageName, vid)
+
+            val entity = DownloadEntity(
+                taskKey = key,
+                appId = app.appId,
+                versionId = vid,
+                packageName = app.packageName,
+                name = app.name,
+                categoryId = app.category.id,
+                downloadUrl = "", // 这里暂存空，实际可在下载开始时传入
+                savePath = app.apkPath ?: "", // 关键：保存下载路径
+                progress = app.progress,
+                status = app.downloadStatus.ordinal
+            )
+            downloadDao.insertOrUpdate(entity)
         }
     }
 
@@ -128,6 +162,8 @@ object AppRepository {
             if (localDownloadQueue.none { taskKey(it) == key }) {
                 localDownloadQueue = localDownloadQueue + app
                 _downloadQueue.postValue(localDownloadQueue)
+                // 首次加入数据库
+                saveToDatabase(app)
             }
         }
     }
@@ -136,6 +172,11 @@ object AppRepository {
         synchronized(stateLock) {
             localDownloadQueue = localDownloadQueue.filterNot { taskKey(it) == taskKey }
             _downloadQueue.postValue(localDownloadQueue)
+
+            //  从数据库删除
+            coroutineScope.launch {
+                downloadDao.deleteTask(taskKey)
+            }
         }
     }
 
@@ -148,8 +189,65 @@ object AppRepository {
         }
     }
 
+    // ----------------------------
+    // 初始化逻辑
+    // ----------------------------
+
     fun initialize(context: Context) {
-        requestAppList(context, AppCategory.YANNUO)
+        // ★ 1. 初始化数据库
+        val db = AppDatabase.getDatabase(context)
+        downloadDao = db.downloadDao()
+
+        // ★ 2. 异步加载历史任务，再请求网络
+        coroutineScope.launch {
+            val entities = downloadDao.getAllTasks()
+
+            val restoredQueue = entities.map { entity ->
+                // 状态修正：重启后所有的 DOWNLOADING 应该变为 PAUSED
+                var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
+                if (status == DownloadStatus.DOWNLOADING) {
+                    status = DownloadStatus.PAUSED
+                }
+
+                // 检查文件是否存在，如果文件丢了，状态重置
+                if (status == DownloadStatus.PAUSED && entity.savePath.isNotEmpty()) {
+                    val file = File(entity.savePath)
+                    if (!file.exists()) {
+                        status = DownloadStatus.NONE
+                    }
+                }
+
+                val finalProgress = if (status == DownloadStatus.NONE) 0 else entity.progress
+
+                AppInfo(
+                    name = entity.name,
+                    appId = entity.appId,
+                    versionId = entity.versionId,
+                    category = AppCategory.values().find { it.id == entity.categoryId } ?: AppCategory.YANNUO,
+                    createTime = null,
+                    updateTime = null,
+                    remark = null,
+                    description = "",
+                    size = "N/A",
+                    downloadCount = 0,
+                    packageName = entity.packageName,
+                    apkPath = entity.savePath,
+                    installState = InstallState.NOT_INSTALLED, // 后续网络请求会修正
+                    versionName = "已暂停",
+                    releaseDate = "",
+                    downloadStatus = status,
+                    progress = finalProgress
+                )
+            }.filter { it.downloadStatus != DownloadStatus.NONE }
+
+            synchronized(stateLock) {
+                localDownloadQueue = restoredQueue
+                _downloadQueue.postValue(localDownloadQueue)
+            }
+
+            // 3. 初始请求网络
+            requestAppList(context, AppCategory.YANNUO)
+        }
     }
 
     fun selectCategory(context: Context, category: AppCategory) {
@@ -161,19 +259,18 @@ object AppRepository {
         val key = category.id
         val now = System.currentTimeMillis()
 
-        // ✅ 1. 节流：1.5 秒内重复触发直接忽略
+        //  1. 节流
         val last = lastFetchAt[key] ?: 0L
         if (now - last < MIN_FETCH_INTERVAL_MS) return
         lastFetchAt[key] = now
 
-        // ✅ 2. 单飞：该分类请求还在跑，就不再发第二次
+        //  2. 单飞
         if (refreshJobs[key]?.isActive == true) return
 
         refreshJobs[key] = coroutineScope.launch {
             refreshAppsFromServer(context, category)
         }
     }
-
 
     private suspend fun refreshAppsFromServer(context: Context, category: AppCategory?) {
         _isLoading.postValue(true)
@@ -213,18 +310,33 @@ object AppRepository {
                             else -> InstallState.INSTALLED_LATEST
                         }
 
-                        mapToAppInfo(serverApp, localApp).copy(
+                        // ★ 关键：如果本地下载队列里有这个任务，优先使用队列的状态（因为那是断点续传的真理）
+                        val queueItem = localDownloadQueue.find {
+                            it.appId == serverApp.appId && it.versionId == serverApp.id?.toLong()
+                        }
+
+                        val baseInfo = mapToAppInfo(serverApp, localApp).copy(
                             packageName = finalPackageName,
                             installState = installState,
                             isInstalled = isInstalled
                         )
+
+                        if (queueItem != null) {
+                            baseInfo.copy(
+                                downloadStatus = queueItem.downloadStatus,
+                                progress = queueItem.progress,
+                                apkPath = queueItem.apkPath
+                            )
+                        } else {
+                            baseInfo
+                        }
                     }
 
                     val otherCategoryApps = localAllApps.filter { it.category != category }
                     localAllApps = otherCategoryApps + mergedRemoteList
                     _allApps.postValue(localAllApps)
                 }
-                _isLoading.postValue(false) // success 才关闭
+                _isLoading.postValue(false)
             } else {
                 _allApps.postValue(localAllApps.filter { it.category == category })
             }
@@ -262,50 +374,40 @@ object AppRepository {
             if (response.code == 200 && response.data != null) {
                 response.data.fileUrl
             } else {
-                Log.e("DOWNLOAD", "API error getting download link: ${response.msg}")
+                Log.e(TAG, "API error getting download link: ${response.msg}")
                 ""
             }
         } catch (e: Exception) {
-            Log.e("DOWNLOAD", "Failed to resolve download URL for versionId: $versionId", e)
+            Log.e(TAG, "Failed to resolve download URL for versionId: $versionId", e)
             ""
         }
     }
 
     /**
-     * ✅ 方案B最关键修复点：
-     * 不再用 app.downloadStatus 决定"暂停/继续"，而是用 downloadJobs.containsKey(taskKey)
-     * 避免低版本详情页拿到的状态和真实 job 状态不一致，导致"一点就暂停"
+     *  方案B最关键修复点：taskKey 管理 + 数据库持久化
      */
     fun toggleDownload(app: AppInfo) {
         val versionId = app.versionId
         if (versionId == null) {
-            Log.e("DOWNLOAD", "Cannot download ${app.name}, versionId is null.")
+            Log.e(TAG, "Cannot download ${app.name}, versionId is null.")
             return
         }
 
         val key = taskKey(app.packageName, versionId)
-
-        // ✅ 是否正在下载：只认 job
         val isDownloading = downloadJobs.containsKey(key)
-        
-        // ✅ 是否已暂停：检查状态
         val isPaused = app.downloadStatus == DownloadStatus.PAUSED
 
         if (isDownloading) {
             downloadJobs[key]?.cancel()
             return
         }
-        
-        // 如果是暂停状态，则恢复下载而不是重新开始
+
         if (isPaused) {
-            // 更新状态为下载中，但保留现有进度
             updateAppStatus(app.packageName, versionId) {
                 it.copy(downloadStatus = DownloadStatus.DOWNLOADING)
             }
         } else {
-            // 开始新的下载
             addToDownloadQueue(app)
-
             updateAppStatus(app.packageName, versionId) {
                 it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
             }
@@ -318,12 +420,17 @@ object AppRepository {
                     throw IllegalStateException("Download URL is blank for versionId $versionId")
                 }
 
+                // ★ 这里没有现成的路径，但在 XcServiceManager 下载过程中会生成
+                // 通常建议预先构建路径并保存到 DB，这里我们假设 onProgress 回调时状态会自动写入 DB
+
                 val installedPackageName = XcServiceManager.downloadAndInstall(
                     appId = app.appId,
                     versionId = versionId,
                     url = realApkPath,
                     onProgress = { percent ->
                         updateAppStatus(app.packageName, versionId) { current ->
+                            // 如果 apkPath 为空，可以在这里补全（需修改 XcServiceManager 返回路径或推断路径）
+                            // 简单起见，我们假设下次启动检查文件存在性
                             current.copy(progress = percent)
                         }
                     }
@@ -353,7 +460,7 @@ object AppRepository {
                 addToRecentInstalled(app.copy(installState = newInstallState))
 
                 downloadJobs.remove(key)
-                removeFromDownloadQueue(key)
+                removeFromDownloadQueue(key) // 任务完成后从 DB 和队列移除
 
             } catch (e: CancellationException) {
                 val isDeletion = cancellationsForDeletion.remove(key)
@@ -365,7 +472,7 @@ object AppRepository {
                 downloadJobs.remove(key)
 
             } catch (e: Exception) {
-                Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
+                Log.e(TAG, "Download/Install failed for ${app.name}", e)
                 updateAppStatus(app.packageName, versionId) {
                     it.copy(downloadStatus = DownloadStatus.PAUSED)
                 }
@@ -428,7 +535,7 @@ object AppRepository {
 
         XcServiceManager.deleteDownloadedFile(app.appId, versionId)
 
-        removeFromDownloadQueue(key)
+        removeFromDownloadQueue(key) // 会触发 DB 删除
         updateAppStatus(app.packageName, versionId) {
             it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
         }

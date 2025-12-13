@@ -81,7 +81,11 @@ class DownloadQueueFragment : Fragment() {
 
         // 竖屏单任务卡片上的暂停/继续 与 取消
         binding.tvStatus?.setOnClickListener { viewModel.onStatusClick() }
-        binding.ivCancelDownload?.setOnClickListener { viewModel.cancelDownload() }
+        binding.ivCancelDownload?.setOnClickListener { 
+            viewModel.activeTask.value?.let { task ->
+                viewModel.cancelDownload(task)
+            }
+        }
 
         // 横屏小卡片：点击「查看更多」展开“最近安装完成”
         binding.tvSeeMore?.setOnClickListener {
