@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:targetApi="31" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -17,7 +18,18 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.StoreChat">
+        android:theme="@style/Theme.StoreChat"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.example.storechat.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- ★ AndroidAutoSize 屏幕适配插件配置 -->
         <!-- 设计图基准宽度 -->
@@ -35,7 +47,7 @@
 
 
 
-        <!-- ★ 切换为“默认关闭，手动开启”的混合适配模式 -->
+        <!--  切换为“默认关闭，手动开启”的混合适配模式 -->
         <meta-data
             android:name="autosize_is_adapting_by_default"
             android:value="true" />

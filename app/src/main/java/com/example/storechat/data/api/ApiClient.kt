@@ -14,7 +14,7 @@ object ApiClient {
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {
         HttpLoggingInterceptor().apply {
-            // 你现在是 BODY，弱网+大响应会很慢；建议调成 BASIC 或 HEADERS
+
             level = HttpLoggingInterceptor.Level.BASIC
         }
     }

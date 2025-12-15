@@ -131,7 +131,7 @@ class HomeFragment : Fragment() {
     private fun observeViewModel() {
         viewModel.apps.observe(viewLifecycleOwner) { apps ->
             appListAdapter.submitList(apps)
-            // ✅ 不要在这里动 progressBar（否则无网络时也会被你强制关掉）
+            //  不要在这里动 progressBar（否则无网络时也会被你强制关掉）
         }
 
         viewModel.checkUpdateResult.observe(viewLifecycleOwner) { status ->
@@ -185,7 +185,7 @@ class HomeFragment : Fragment() {
             redDot?.visibility = if (visible == true) View.VISIBLE else View.GONE
         }
 
-        // ✅ 唯一入口：只靠 isLoading 控制转圈
+        //  唯一入口：只靠 isLoading 控制转圈
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             binding.progressBar?.visibility =
                 if (isLoading == true) View.VISIBLE else View.GONE

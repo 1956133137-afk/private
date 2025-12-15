@@ -139,6 +139,10 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
     }
 
     override fun getSizeInDp(): Float {
-        return if (isBaseOnWidth()) 411f else 731f
+        return if (isBaseOnWidth()) {
+            411f   // 竖屏：设计稿宽度
+        } else {
+            500f   // 横屏：用竖屏的"高度"当基准，保证纵向比例正常
+        }
     }
 }
