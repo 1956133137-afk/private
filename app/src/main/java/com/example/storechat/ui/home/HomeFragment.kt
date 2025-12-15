@@ -3,6 +3,7 @@ package com.example.storechat.ui.home
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +13,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.example.storechat.MainActivity
+import com.example.storechat.R
 import com.example.storechat.databinding.FragmentHomeBinding
 import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
@@ -19,10 +21,12 @@ import com.example.storechat.model.UpdateStatus
 import com.example.storechat.ui.detail.AppDetailActivity
 import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
+import com.example.storechat.util.LogUtil
 import com.google.android.material.tabs.TabLayout
 
 class HomeFragment : Fragment() {
 
+    private val TAG = "HomeFragment"
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
@@ -51,12 +55,23 @@ class HomeFragment : Fragment() {
                 AppCategory.values()[binding.tabLayoutCategories.selectedTabPosition]
             viewModel.selectCategory(requireContext(), initialCategory)
         }
+        
+        // 初始化时清除搜索框焦点
+        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            binding.etSearch?.clearFocus()
+            // 设置初始时不获取焦点
+            binding.etSearch?.isFocusable = false
+            binding.etSearch?.isFocusableInTouchMode = false
+        }
     }
 
     override fun onResume() {
         super.onResume()
         if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
             refreshCurrentCategory()
+        } else {
+            // 横屏模式下确保搜索框不获取焦点
+            binding.etSearch?.clearFocus()
         }
     }
 
@@ -68,7 +83,7 @@ class HomeFragment : Fragment() {
         binding.recyclerAppList.adapter = appListAdapter
 
         binding.tabLayoutCategories.apply {
-            AppCategory.values().forEach { category ->
+            AppCategory.values().forEach { category -> 
                 addTab(newTab().setText(category.title))
             }
             tabGravity = TabLayout.GRAVITY_FILL
@@ -79,6 +94,7 @@ class HomeFragment : Fragment() {
             TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 val category = AppCategory.values()[tab.position]
+                LogUtil.d(TAG, "Tab selected: ${category.title}")
                 viewModel.selectCategory(requireContext(), category)
             }
 
@@ -98,8 +114,14 @@ class HomeFragment : Fragment() {
                 false
             }
         }
+        
+        // 点击搜索框时才允许获取焦点
         binding.etSearch?.setOnClickListener {
-            binding.etSearch?.requestFocus()
+            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                binding.etSearch?.isFocusable = true
+                binding.etSearch?.isFocusableInTouchMode = true
+                binding.etSearch?.requestFocus()
+            }
         }
 
         // 下载按钮点击：清红点 + 跳转下载页 / 抽屉
@@ -119,10 +141,15 @@ class HomeFragment : Fragment() {
 
     private fun performSearch() {
         val keyword = binding.etSearch?.text?.toString().orEmpty()
+        LogUtil.d(TAG, "Performing search with keyword: $keyword")
 
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            // 横屏模式下执行搜索
             viewModel.inlineSearch(keyword)
+            // 搜索完成后清除焦点
             binding.etSearch?.clearFocus()
+            binding.etSearch?.isFocusable = false
+            binding.etSearch?.isFocusableInTouchMode = false
         } else {
             SearchActivity.start(requireContext(), keyword)
         }
@@ -130,6 +157,7 @@ class HomeFragment : Fragment() {
 
     private fun observeViewModel() {
         viewModel.apps.observe(viewLifecycleOwner) { apps ->
+//            LogUtil.d(TAG, "Received apps update, count: ${apps.size}")
             appListAdapter.submitList(apps)
             //  不要在这里动 progressBar（否则无网络时也会被你强制关掉）
         }

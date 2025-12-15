@@ -114,6 +114,8 @@
                     android:paddingEnd="1dp"
                     android:singleLine="true"
                     android:textSize="10sp"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toStartOf="@id/ivSearch" />

@@ -1,5 +1,6 @@
 package com.example.storechat.data.api
 
+import android.util.Log
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -13,6 +14,8 @@ import java.util.UUID
  * 自动对 POST JSON 请求进行封装 + 加签
  */
 class SignInterceptor : Interceptor {
+
+    private val TAG = "SignInterceptor"
 
     @Throws(IOException::class)
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -28,6 +31,9 @@ class SignInterceptor : Interceptor {
         val buffer = Buffer()
         body.writeTo(buffer)
         val dataString = buffer.readUtf8()
+        
+        Log.d(TAG, "Original request URL: ${request.url}")
+        Log.d(TAG, "Original request body: $dataString")
 
         // 2. 准备签名所需参数
         val timestamp = SignUtils.generateTimestampMillis()
@@ -55,6 +61,8 @@ class SignInterceptor : Interceptor {
             put("sign", sign)
         }
 
+        Log.d(TAG, "Signed request body: ${newJsonBody.toString()}")
+
         // 6. 创建新的 RequestBody
         val newRequestBody = newJsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 
@@ -64,6 +72,9 @@ class SignInterceptor : Interceptor {
             .post(newRequestBody)
             .build()
 
-        return chain.proceed(request)
+        val response = chain.proceed(request)
+        Log.d(TAG, "Response code: ${response.code}, message: ${response.message}")
+        
+        return response
     }
 }

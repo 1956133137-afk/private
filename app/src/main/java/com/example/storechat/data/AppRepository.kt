@@ -240,12 +240,17 @@ object AppRepository {
     private suspend fun refreshAppsFromServer(context: Context, category: AppCategory?) {
         _isLoading.postValue(true)
         try {
+            LogUtil.d(TAG, "Starting request for app list, category: ${category?.id}")
             val response = apiService.getAppList(AppListRequestBody(appCategory = category?.id))
+            LogUtil.d(TAG, "Received response for app list, category: ${category?.id}")
 
             if (response.code == 200 && response.data != null) {
+                LogUtil.d(TAG, "Response successful, data count: ${response.data.size}")
                 val distinctList = response.data
                     .groupBy { it.appId }
                     .map { (_, apps) -> apps.maxByOrNull { it.id ?: -1 }!! }
+
+                LogUtil.d(TAG, "Distinct list size: ${distinctList.size}")
 
                 synchronized(stateLock) {
                     val localAppsMap = localAllApps.associateBy { it.appId }
@@ -298,10 +303,11 @@ object AppRepository {
                 }
                 _isLoading.postValue(false)
             } else {
+                LogUtil.w(TAG, "Response not successful, code: ${response.code}, message: ${response.msg}")
                 _allApps.postValue(localAllApps.filter { it.category == category })
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtil.e(TAG, "Error refreshing apps from server", e)
             _allApps.postValue(localAllApps.filter { it.category == category })
         }
     }

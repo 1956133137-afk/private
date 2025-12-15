@@ -1,5 +1,6 @@
 package com.example.storechat.data.api
 
+import android.util.Log
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
@@ -10,12 +11,18 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
+    private const val TAG = "ApiClient"
     private const val BASE_URL = "https://test.yannuozhineng.com/acms/api/"
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {
-        HttpLoggingInterceptor().apply {
-
-            level = HttpLoggingInterceptor.Level.BASIC
+        HttpLoggingInterceptor(object : HttpLoggingInterceptor.Logger {
+            override fun log(message: String) {
+                Log.i(TAG, message)
+                // 同时写入文件日志
+                com.example.storechat.util.LogUtil.i(TAG, message)
+            }
+        }).apply {
+            level = HttpLoggingInterceptor.Level.BODY
         }
     }
 

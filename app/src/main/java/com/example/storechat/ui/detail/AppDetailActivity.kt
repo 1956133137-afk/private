@@ -71,7 +71,18 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             startActivity(intent)
         }
-        binding.ivSearch.setOnClickListener { SearchActivity.start(this) }
+        
+        binding.ivSearch.setOnClickListener { 
+            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                // 横屏模式下跳转到首页
+                val intent = Intent(this, MainActivity::class.java)
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                startActivity(intent)
+            } else {
+                // 竖屏模式下保持原有逻辑
+                SearchActivity.start(this)
+            }
+        }
 
         binding.ivDownload.setOnClickListener {
             if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
