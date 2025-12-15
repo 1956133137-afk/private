@@ -16,7 +16,9 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="84dp"
-        android:paddingVertical="6dp">
+        android:paddingVertical="6dp"
+        android:layout_margin="5dp"
+        android:background="@drawable/bg_home_progress_capsule_lan">
 
         <!-- 左侧 APK 图标 -->
         <ImageView

@@ -152,7 +152,7 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         return if (isBaseOnWidth()) {
             411f
         } else {
-            500f
+            450f
         }
     }
 }

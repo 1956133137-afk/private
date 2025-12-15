@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
         return if (isBaseOnWidth()) {
             411f
         } else {
-            500f
+            450f
         }
     }
 }

@@ -45,9 +45,9 @@ class AppListAdapter(
             binding.executePendingBindings()
 
             binding.root.setOnClickListener { onItemClick(app) }
-            binding.ivIcon.setOnClickListener { onItemClick(app) }
-            binding.btnAction.setOnClickListener { onActionClick(app) }
-            binding.layoutProgress.setOnClickListener { onActionClick(app) }
+            binding.ivIcon?.setOnClickListener { onItemClick(app) }
+            binding.btnAction?.setOnClickListener { onActionClick(app) }
+            binding.layoutProgress?.setOnClickListener { onActionClick(app) }
         }
     }
 }
