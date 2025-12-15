@@ -22,11 +22,6 @@ class AppDetailFragment : Fragment() {
     // 与 AppDetailActivity 共享同一个 ViewModel 实例
     private val viewModel: AppDetailViewModel by activityViewModels()
 
-    // 为安装/进度按钮设置点击事件
-    private val installClickListener: (View) -> Unit = {
-        viewModel.appInfo.value?.let(AppRepository::toggleDownload)
-    }
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -41,13 +36,20 @@ class AppDetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 横屏模式下，Fragment 包含安装按钮和可滚动的描述文本, 需要在这里设置监听器和滚动方法
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            binding.btnInstall?.setOnClickListener(installClickListener)
-            binding.layoutProgress?.setOnClickListener(installClickListener)
+            val landscapeClickListener: (View) -> Unit = {
+                (activity as? AppDetailActivity)?.openDrawer()
+            }
+            binding.btnInstall?.setOnClickListener(landscapeClickListener)
+            binding.layoutProgress?.setOnClickListener(landscapeClickListener)
 
-            // 2. 使应用简介的 TextView 可以滚动
             binding.tvDescription?.movementMethod = ScrollingMovementMethod.getInstance()
+        } else {
+            val portraitClickListener: (View) -> Unit = {
+                viewModel.appInfo.value?.let(AppRepository::toggleDownload)
+            }
+            binding.btnInstall?.setOnClickListener(portraitClickListener)
+            binding.layoutProgress?.setOnClickListener(portraitClickListener)
         }
     }
 

@@ -1,5 +1,6 @@
 package com.example.storechat
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
@@ -20,16 +21,9 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize App Package Name Cache
         AppPackageNameCache.init(applicationContext)
-
-        // Initialize Log Utility
         LogUtil.init(applicationContext)
-
-        // Initialize App Repository
         AppRepository.initialize(applicationContext)
-
-        // Initialize XC Service Manager
         XcServiceManager.init(this)
 
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -41,6 +35,23 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
                 .replace(R.id.mainContainer, HomeFragment())
                 .commit()
         }
+
+        // 检查启动 Intent，看是否需要打开抽屉
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // 当 Activity 已在后台时，处理新的 Intent
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent) {
+        if (intent.getBooleanExtra("OPEN_DOWNLOAD_DRAWER", false)) {
+            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                drawerLayout?.post { openDrawer() }
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -51,16 +62,15 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
         drawerLayout?.openDrawer(GravityCompat.END)
     }
 
-    // 竖屏：按宽度 411 适配；横屏：按高度 731 适配
     override fun isBaseOnWidth(): Boolean {
         return resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     }
 
     override fun getSizeInDp(): Float {
         return if (isBaseOnWidth()) {
-            411f   // 竖屏：设计稿宽度
+            411f
         } else {
-            500f   // 横屏：用竖屏的"高度"当基准，保证纵向比例正常
+            500f
         }
     }
 }

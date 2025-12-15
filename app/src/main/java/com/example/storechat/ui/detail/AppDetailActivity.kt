@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
-import com.example.storechat.util.LogUtil
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -12,7 +11,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.GravityCompat
 import androidx.databinding.DataBindingUtil
+import androidx.drawerlayout.widget.DrawerLayout
 import com.example.storechat.MainActivity
 import com.example.storechat.R
 import com.example.storechat.data.AppRepository
@@ -21,6 +22,7 @@ import com.example.storechat.model.AppInfo
 import com.example.storechat.model.InstallState
 import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
+import com.example.storechat.util.LogUtil
 import com.google.android.material.tabs.TabLayoutMediator
 import me.jessyan.autosize.internal.CustomAdapt
 
@@ -44,7 +46,6 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         }
 
         if (appInfo != null) {
-            // ✅ 历史版本详情：保持监听 repo 的状态变化
             viewModel.setHistoryAppInfo(appInfo)
         } else {
             val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME)
@@ -59,6 +60,11 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         setupViewPagerAndTabs()
     }
 
+    fun openDrawer() {
+        // 在横屏模式下，binding.drawerLayout 才不为 null
+        binding.drawerLayout?.openDrawer(GravityCompat.END)
+    }
+
     private fun setupViews() {
         binding.ivBack.setOnClickListener {
             val intent = Intent(this, MainActivity::class.java)
@@ -66,8 +72,13 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
             startActivity(intent)
         }
         binding.ivSearch.setOnClickListener { SearchActivity.start(this) }
+
         binding.ivDownload.setOnClickListener {
-            startActivity(Intent(this, DownloadQueueActivity::class.java))
+            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                openDrawer()
+            } else {
+                startActivity(Intent(this, DownloadQueueActivity::class.java))
+            }
         }
 
         val clickListener: (view: View) -> Unit = {
@@ -81,7 +92,6 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
                         Toast.makeText(this, "无法打开应用", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    // ✅ toggleDownload 已按 taskKey 修复
                     AppRepository.toggleDownload(currentAppInfo)
                 }
             }
@@ -140,9 +150,9 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
 
     override fun getSizeInDp(): Float {
         return if (isBaseOnWidth()) {
-            411f   // 竖屏：设计稿宽度
+            411f
         } else {
-            500f   // 横屏：用竖屏的"高度"当基准，保证纵向比例正常
+            500f
         }
     }
 }
