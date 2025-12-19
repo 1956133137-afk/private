@@ -5,7 +5,7 @@
     <item android:id="@android:id/background">
         <shape>
             <solid android:color="@android:color/transparent" />
-            <corners android:radius="16dp" />
+            <corners android:radius="4dp" />
         </shape>
     </item>
 
@@ -15,7 +15,7 @@
             <shape>
                 <!-- 这里用带透明度的蓝色，看起来更接近设计图的浅蓝 -->
                 <solid android:color="#332F7BFF" />
-                <corners android:radius="16dp" />
+                <corners android:radius="4dp" />
             </shape>
         </clip>
     </item>
