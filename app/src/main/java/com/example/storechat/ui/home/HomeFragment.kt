@@ -3,7 +3,6 @@ package com.example.storechat.ui.home
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -55,7 +54,7 @@ class HomeFragment : Fragment() {
                 AppCategory.values()[binding.tabLayoutCategories.selectedTabPosition]
             viewModel.selectCategory(requireContext(), initialCategory)
         }
-        
+
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             binding.etSearch?.clearFocus()
             binding.etSearch?.isFocusable = false
@@ -79,11 +78,11 @@ class HomeFragment : Fragment() {
         )
         binding.recyclerAppList.adapter = appListAdapter
 
-        // Setting the itemAnimator to null is the most definitive way to disable all animations.
+        // Disable change animations to prevent flickering on progress updates.
         binding.recyclerAppList.itemAnimator = null
 
         binding.tabLayoutCategories.apply {
-            AppCategory.values().forEach { category -> 
+            AppCategory.values().forEach { category ->
                 addTab(newTab().setText(category.title))
             }
             tabGravity = TabLayout.GRAVITY_FILL
@@ -113,7 +112,7 @@ class HomeFragment : Fragment() {
                 false
             }
         }
-        
+
         binding.etSearch?.setOnClickListener {
             if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 binding.etSearch?.isFocusable = true
@@ -206,8 +205,11 @@ class HomeFragment : Fragment() {
         }
 
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            binding.progressBar?.visibility =
-                if (isLoading == true) View.VISIBLE else View.GONE
+            binding.progressBar?.visibility = if (isLoading == true) View.VISIBLE else View.GONE
+        }
+
+        viewModel.showNetworkError.observe(viewLifecycleOwner) { isError ->
+            binding.tvNetworkError?.visibility = if (isError) View.VISIBLE else View.GONE
         }
     }
 
