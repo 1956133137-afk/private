@@ -56,10 +56,8 @@ class HomeFragment : Fragment() {
             viewModel.selectCategory(requireContext(), initialCategory)
         }
         
-        // 初始化时清除搜索框焦点
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             binding.etSearch?.clearFocus()
-            // 设置初始时不获取焦点
             binding.etSearch?.isFocusable = false
             binding.etSearch?.isFocusableInTouchMode = false
         }
@@ -70,7 +68,6 @@ class HomeFragment : Fragment() {
         if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
             refreshCurrentCategory()
         } else {
-            // 横屏模式下确保搜索框不获取焦点
             binding.etSearch?.clearFocus()
         }
     }
@@ -81,6 +78,9 @@ class HomeFragment : Fragment() {
             onActionClick = { app -> viewModel.handleAppAction(app) }
         )
         binding.recyclerAppList.adapter = appListAdapter
+
+        // Setting the itemAnimator to null is the most definitive way to disable all animations.
+        binding.recyclerAppList.itemAnimator = null
 
         binding.tabLayoutCategories.apply {
             AppCategory.values().forEach { category -> 
@@ -104,7 +104,6 @@ class HomeFragment : Fragment() {
             }
         })
 
-        // 搜索按钮 & 键盘搜索
         binding.ivSearch?.setOnClickListener { performSearch() }
         binding.etSearch?.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
@@ -115,7 +114,6 @@ class HomeFragment : Fragment() {
             }
         }
         
-        // 点击搜索框时才允许获取焦点
         binding.etSearch?.setOnClickListener {
             if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 binding.etSearch?.isFocusable = true
@@ -124,7 +122,6 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // 下载按钮点击：清红点 + 跳转下载页 / 抽屉
         val openDownloadPage: () -> Unit = {
             viewModel.onDownloadIconClicked()
             if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -144,9 +141,7 @@ class HomeFragment : Fragment() {
         LogUtil.d(TAG, "Performing search with keyword: $keyword")
 
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            // 横屏模式下执行搜索
             viewModel.inlineSearch(keyword)
-            // 搜索完成后清除焦点
             binding.etSearch?.clearFocus()
             binding.etSearch?.isFocusable = false
             binding.etSearch?.isFocusableInTouchMode = false
@@ -157,9 +152,7 @@ class HomeFragment : Fragment() {
 
     private fun observeViewModel() {
         viewModel.apps.observe(viewLifecycleOwner) { apps ->
-//            LogUtil.d(TAG, "Received apps update, count: ${apps.size}")
             appListAdapter.submitList(apps)
-            //  不要在这里动 progressBar（否则无网络时也会被你强制关掉）
         }
 
         viewModel.checkUpdateResult.observe(viewLifecycleOwner) { status ->
@@ -189,7 +182,6 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // 下载相关
         viewModel.isDownloadInProgress.observe(viewLifecycleOwner) { inProgress ->
             val progressCircle = binding.cpiDownloadProgress
             val downloadIcon = binding.ivDownloadManager
@@ -213,7 +205,6 @@ class HomeFragment : Fragment() {
             redDot?.visibility = if (visible == true) View.VISIBLE else View.GONE
         }
 
-        //  唯一入口：只靠 isLoading 控制转圈
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             binding.progressBar?.visibility =
                 if (isLoading == true) View.VISIBLE else View.GONE
@@ -224,7 +215,6 @@ class HomeFragment : Fragment() {
         val selectedTabPosition = binding.tabLayoutCategories.selectedTabPosition
         if (selectedTabPosition != TabLayout.Tab.INVALID_POSITION) {
             val category = AppCategory.values()[selectedTabPosition]
-            // selectCategory() 会置 isLoading=true
             viewModel.selectCategory(requireContext(), category)
         }
     }
