@@ -19,9 +19,9 @@
         <!-- App Icon -->
         <ImageView
             android:id="@+id/ivAppIcon"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:src="@drawable/ic_apk_green"
+            android:layout_width="70dp"
+            android:layout_height="70dp"
+            android:src="@drawable/bg_app_apk"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
@@ -30,9 +30,9 @@
             android:id="@+id/tvAppName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="20dp"
             android:text='@{viewModel.appInfo.name}'
-            android:textColor="@color/text_primary"
+            android:textColor="@color/black"
             android:textSize="14sp"
             android:textStyle="bold"
             app:layout_constraintStart_toEndOf="@id/ivAppIcon"
@@ -54,31 +54,34 @@
         <!-- Install Button -->
         <Button
             android:id="@+id/btnInstall"
-            style="?android:attr/borderlessButtonStyle"
             android:layout_width="wrap_content"
-            android:layout_height="31dp"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="5dp"
+            android:layout_height="25dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="4dp"
             android:background="@drawable/bg_btn_action"
-            android:enabled='@{viewModel.appInfo.buttonEnabled}'
+
+
+            app:backgroundTint="@null"
             android:text='@{viewModel.appInfo.buttonText}'
             android:textColor="@android:color/white"
             android:textSize="9sp"
-            android:gravity="center"
             android:minWidth="70dp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
+            android:paddingStart="1dp"
+            android:paddingEnd="1dp"
+            android:paddingTop="1dp"
+            android:paddingBottom="1dp"
             android:visibility="@{viewModel.appInfo.showButton ? View.VISIBLE : View.GONE}"
             app:layout_constraintStart_toEndOf="@id/ivAppIcon"
             app:layout_constraintTop_toBottomOf="@id/tvAppSource"
             tools:text="安装" />
 
+
         <!-- Progress Layout -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/layoutProgress"
             android:layout_width="wrap_content"
-            android:layout_height="31dp"
-            android:layout_marginStart="12dp"
+            android:layout_height="25dp"
+            android:layout_marginStart="20dp"
             android:layout_marginTop="5dp"
             android:background="@drawable/bg_btn_progress"
             android:visibility="@{viewModel.appInfo.showProgress ? View.VISIBLE : View.GONE}"
@@ -207,7 +210,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text='@{viewModel.appInfo.releaseDate}'
+                    android:text='@{viewModel.appInfo.formattedReleaseDate}'
                     android:textColor="@color/text_primary"
                     android:textSize="9sp"
                     tools:text="2025-11-12" />
@@ -240,7 +243,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="应用简介"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/text_secondary"
             android:textSize="15sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
@@ -255,8 +258,8 @@
             android:lineSpacingExtra="4dp"
             android:scrollbars="vertical"
             android:text='@{viewModel.appInfo.description}'
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
+            android:textColor="@color/black"
+            android:textSize="12sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"

@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 按钮不可用状态 - 与正常状态相同颜色 -->
+    <!-- 按钮不可用状态 -->
     <item android:state_enabled="false">
         <shape android:shape="rectangle">
-            <solid android:color="@color/blue_action" />
+            <solid android:color="#CCCCCC" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+    <!-- 按钮按下状态 -->
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#1E6ED4" /> <!-- 深一些的蓝色 -->
             <corners android:radius="4dp" />
         </shape>
     </item>
     <!-- 按钮正常状态 -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/blue_action" />
+            <solid android:color="#2F7BFF" />
             <corners android:radius="4dp" />
         </shape>
     </item>

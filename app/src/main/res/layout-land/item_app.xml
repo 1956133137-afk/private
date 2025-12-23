@@ -20,7 +20,6 @@
         android:layout_margin="5dp"
         android:background="@drawable/bg_home_progress_capsule_lan">
 
-        <!-- 左侧 APK 图标 -->
         <ImageView
             android:id="@+id/ivIcon"
             android:layout_width="60dp"
@@ -32,7 +31,6 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
 
-        <!-- 文本区域 -->
         <LinearLayout
             android:id="@+id/contentText"
             android:layout_width="0dp"
@@ -80,34 +78,39 @@
                 tools:text="应用简介说明应用简介说明应用简介说明..." />
         </LinearLayout>
 
-        <!-- 右侧操作按钮（安装 / 升级 / 打开） -->
         <Button
             android:id="@+id/btnAction"
             android:layout_width="65dp"
             android:layout_height="27dp"
             android:layout_marginEnd="16dp"
+
             android:text='@{app.buttonText}'
             android:textSize="13sp"
             android:textAllCaps="false"
+
             android:paddingTop="0dp"
             android:paddingLeft="0dp"
             android:paddingRight="0dp"
             android:paddingBottom="0dp"
+
             android:fontFamily="sans-serif-medium"
             android:includeFontPadding="false"
             android:gravity="center"
             android:singleLine="true"
             android:ellipsize="none"
-            android:background="@color/black"
-            android:textColor="@color/btn_inis_bg"
+
             android:enabled='@{app.buttonEnabled}'
             android:visibility="@{app.showProgress ? View.INVISIBLE : View.VISIBLE}"
+
+            android:background="@drawable/bg_home_progress_capsule"
+            app:backgroundTint="@null"
+            android:textColor="@color/blue_action"
+
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@id/ivIcon"
             app:layout_constraintBottom_toBottomOf="@id/ivIcon"
             />
 
-        <!-- ★ 下载进度胶囊（设计图样式） -->
         <FrameLayout
             android:id="@+id/layoutProgress"
             android:layout_width="65dp"
@@ -124,7 +127,6 @@
             app:layout_constraintBottom_toBottomOf="@id/ivIcon"
             tools:visibility="visible">
 
-            <!-- 进度填充（浅蓝色从左到右） -->
             <ProgressBar
                 android:id="@+id/progressBar"
                 style="?android:attr/progressBarStyleHorizontal"
@@ -136,7 +138,6 @@
                 android:progressDrawable="@drawable/bg_home_progress_bar"
                 android:background="@android:color/transparent" />
 
-            <!-- 居中文字：16.3% / 继续 / 验证中 / 安装中 -->
             <TextView
                 android:id="@+id/tvProgress"
                 android:layout_width="wrap_content"

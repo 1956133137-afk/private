@@ -97,16 +97,21 @@
                 <com.google.android.material.tabs.TabLayout
                     android:id="@+id/tabLayout"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_margin="2dp"
+                    android:layout_height="24dp"
+                    android:layout_margin="4dp"
                     android:background="@drawable/bg_tab_layout_container"
-                    app:tabBackground="@drawable/bg_tab_selector"
                     app:tabIndicatorHeight="0dp"
-                    app:tabMinWidth="0dp"
-                    app:tabMode="fixed"
+                    app:tabIndicatorColor="@null"
+
                     app:tabRippleColor="@null"
-                    app:tabTextColor="@color/color_tab_text"
-                    app:tabTextAppearance="@style/CustomTabTextAppearance"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:tabMode="fixed"
+                    app:tabGravity="fill"
+                    app:tabPaddingStart="0dp"
+                    app:tabPaddingEnd="0dp"
+                    app:tabPaddingBottom="0dp"
+                    app:tabMinWidth="0dp"
                     />
 
                 <!-- 内容翻页器 -->
@@ -127,6 +132,7 @@
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="24dp"
+            app:backgroundTint="@null"
             android:background="@drawable/bg_btn_action"
             android:enabled='@{viewModel.appInfo.buttonEnabled}'
             android:text='@{viewModel.appInfo.buttonText}'

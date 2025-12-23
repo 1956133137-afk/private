@@ -38,7 +38,18 @@ class AppDetailFragment : Fragment() {
 
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             val landscapeClickListener: (View) -> Unit = {
-                (activity as? AppDetailActivity)?.openDrawer()
+                viewModel.appInfo.value?.let { appInfo ->
+                    if (appInfo.installState == com.example.storechat.model.InstallState.INSTALLED_LATEST) {
+                        val intent = requireActivity().packageManager.getLaunchIntentForPackage(appInfo.packageName)
+                        if (intent != null) {
+                            startActivity(intent)
+                        } else {
+                            android.widget.Toast.makeText(context, "无法打开应用", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        com.example.storechat.data.AppRepository.toggleDownload(appInfo)
+                    }
+                }
             }
             binding.btnInstall?.setOnClickListener(landscapeClickListener)
             binding.layoutProgress?.setOnClickListener(landscapeClickListener)

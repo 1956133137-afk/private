@@ -76,4 +76,10 @@ data class AppInfo(
             DownloadStatus.INSTALLING  -> "安装中"
             DownloadStatus.NONE        -> ""
         }
+    val formattedReleaseDate: String
+        get() = if (releaseDate.contains(' ')) {
+            releaseDate.substring(0, releaseDate.indexOf(' '))
+        } else {
+            releaseDate
+        }
 }

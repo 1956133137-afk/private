@@ -19,7 +19,7 @@
             android:id="@+id/ivAppIcon"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:src="@drawable/ic_apk_green"
+            android:src="@drawable/bg_app_apk"
             tools:ignore="ContentDescription" />
 
         <!-- This view is only for compatibility with the landscape layout -->

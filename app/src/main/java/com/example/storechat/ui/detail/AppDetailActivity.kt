@@ -71,8 +71,8 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             startActivity(intent)
         }
-        
-        binding.ivSearch.setOnClickListener { 
+
+        binding.ivSearch.setOnClickListener {
             if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 // 横屏模式下跳转到首页
                 val intent = Intent(this, MainActivity::class.java)
@@ -107,6 +107,8 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
                 }
             }
         }
+//        binding.btnInstall?.setOnClickListener(clickListener)
+//        binding.layoutProgress?.setOnClickListener(clickListener)
 
         if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
             binding.btnInstall?.setOnClickListener(clickListener)
@@ -118,12 +120,32 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         binding.viewPager.adapter = AppDetailPagerAdapter(this)
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
-            tab.text = when (position) {
+            // 1. 加载自定义布局 (系统会自动根据横竖屏选择 layout 或 layout-land 下的文件)
+            val customView = android.view.LayoutInflater.from(this)
+                .inflate(R.layout.custom_tab, null) as TextView
+
+            customView.text = when (position) {
                 0 -> "最新版本"
                 1 -> "历史版本"
                 else -> ""
             }
+            // 3. 应用自定义 View
+            tab.customView = customView
         }.attach()
+// 4. 添加监听器，确保选中状态能正确刷新颜色
+        binding.tabLayout.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab?) {
+                tab?.customView?.isSelected = true
+            }
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab?) {
+                tab?.customView?.isSelected = false
+            }
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab?) {}
+        })
+        // 5. 初始化第一个 Tab 为选中状态
+        binding.tabLayout.getTabAt(0)?.customView?.isSelected = true
+
+
 
         for (i in 0 until binding.tabLayout.tabCount) {
             val tabView = (binding.tabLayout.getChildAt(0) as ViewGroup).getChildAt(i)

@@ -168,7 +168,7 @@
                 android:gravity="center"
                 android:onClick="@{() -> viewModel.onStatusClick()}"
                 android:text='@{String.format("%.1f%%", (float)viewModel.activeTask.progress)}'
-                android:textColor="@color/blue_action"
+                android:textColor="@color/black"
                 android:textSize="12sp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent"

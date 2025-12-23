@@ -24,7 +24,7 @@
             android:layout_width="52dp"
             android:layout_height="52dp"
             android:layout_marginStart="4dp"
-            android:src="@drawable/ic_apk_green"
+            android:src="@drawable/bg_app_apk"
             android:contentDescription="@null"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -85,6 +85,11 @@
             android:layout_height="35dp"
             android:minWidth="78dp"
             android:layout_marginEnd="4dp"
+
+
+            app:backgroundTint="@null"
+
+
             android:text='@{app.buttonText}'
             android:textSize="13sp"
             android:textAllCaps="false"
@@ -141,7 +146,7 @@
                 android:layout_gravity="center"
                 android:text='@{app.progressText}'
                 android:textSize="13sp"
-                android:textColor="@color/blue_action"
+                android:textColor="@color/black"
                 tools:text="16.3%" />
 
         </FrameLayout>

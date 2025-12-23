@@ -111,6 +111,7 @@
                     android:background="@drawable/bg_search_edit_text_land_no_corners"
                     android:drawablePadding="1dp"
                     android:gravity="start|center_vertical"
+                    android:drawableStart="@drawable/bg_app_sss"
                     android:hint="请输入订单号"
                     android:paddingEnd="1dp"
                     android:singleLine="true"

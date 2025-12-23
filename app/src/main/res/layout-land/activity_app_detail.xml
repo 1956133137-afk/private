@@ -105,7 +105,9 @@
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent">
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    >
 
                     <com.google.android.material.tabs.TabLayout
                         android:id="@+id/tabLayout"
@@ -113,17 +115,17 @@
                         android:layout_height="24dp"
                         android:layout_margin="4dp"
                         android:background="@drawable/bg_tab_layout_container"
+                        app:tabIndicatorHeight="0dp"
+                        app:tabIndicatorColor="@null"
+
+                        app:tabRippleColor="@null"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
-                        app:tabRippleColor="@null"
-                        app:tabTextColor="@color/color_tab_text"
-                        app:tabTextAppearance="@style/CustomTabTextAppearance"
-                        app:tabBackground="@android:color/transparent"
-                        app:tabIndicator="@drawable/tab_indicator_dot"
-                        app:tabIndicatorColor="@color/blue_action"
-                        app:tabIndicatorFullWidth="false"
-                        app:tabIndicatorGravity="bottom"
-                        app:tabMode="scrollable" />
+                        app:tabMode="fixed"
+                        app:tabGravity="fill"
+                        app:tabPaddingStart="0dp"
+                        app:tabPaddingEnd="0dp"
+                        app:tabMinWidth="0dp"/>
 
                     <!-- 内容翻页器 -->
                     <androidx.viewpager2.widget.ViewPager2
