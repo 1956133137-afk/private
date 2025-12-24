@@ -23,6 +23,7 @@ import com.example.storechat.model.InstallState
 import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
 import com.example.storechat.util.LogUtil
+import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import me.jessyan.autosize.internal.CustomAdapt
 
@@ -58,6 +59,7 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
 
         setupViews()
         setupViewPagerAndTabs()
+        observeViewModel()
     }
 
     fun openDrawer() {
@@ -107,8 +109,6 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
                 }
             }
         }
-//        binding.btnInstall?.setOnClickListener(clickListener)
-//        binding.layoutProgress?.setOnClickListener(clickListener)
 
         if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
             binding.btnInstall?.setOnClickListener(clickListener)
@@ -120,7 +120,6 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         binding.viewPager.adapter = AppDetailPagerAdapter(this)
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
-            // 1. 加载自定义布局 (系统会自动根据横竖屏选择 layout 或 layout-land 下的文件)
             val customView = android.view.LayoutInflater.from(this)
                 .inflate(R.layout.custom_tab, null) as TextView
 
@@ -129,23 +128,23 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
                 1 -> "历史版本"
                 else -> ""
             }
-            // 3. 应用自定义 View
             tab.customView = customView
         }.attach()
-// 4. 添加监听器，确保选中状态能正确刷新颜色
-        binding.tabLayout.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab?) {
+
+        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
                 tab?.customView?.isSelected = true
+                viewModel.isHistoryTabSelected.value = tab?.position == 1
             }
-            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab?) {
+
+            override fun onTabUnselected(tab: TabLayout.Tab?) {
                 tab?.customView?.isSelected = false
             }
-            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab?) {}
+
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
         })
-        // 5. 初始化第一个 Tab 为选中状态
+
         binding.tabLayout.getTabAt(0)?.customView?.isSelected = true
-
-
 
         for (i in 0 until binding.tabLayout.tabCount) {
             val tabView = (binding.tabLayout.getChildAt(0) as ViewGroup).getChildAt(i)
@@ -157,6 +156,12 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
                     }
                 }
             }
+        }
+    }
+
+    private fun observeViewModel() {
+        viewModel.switchToTab.observe(this) { tabIndex ->
+            binding.viewPager.setCurrentItem(tabIndex, true)
         }
     }
 

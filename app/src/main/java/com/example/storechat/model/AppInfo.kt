@@ -26,7 +26,8 @@ data class AppInfo(
     val releaseDate: String,
     val downloadStatus: DownloadStatus = DownloadStatus.NONE,
     val progress: Int = 0,
-    var isInstalled: Boolean = false
+    var isInstalled: Boolean = false,
+    val isHistory: Boolean = false
 ) : Serializable {
 
     init {
@@ -66,7 +67,7 @@ data class AppInfo(
         }
 
     val showButton: Boolean
-        get() = !showProgress
+        get() = !showProgress && !isHistory
 
     val progressText: String
         get() = when (downloadStatus) {

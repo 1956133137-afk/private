@@ -73,18 +73,7 @@ class HistoryVersionFragment : Fragment() {
                 }
             },
             onItemClick = { historyVersion ->
-                val currentApp = viewModel.appInfo.value
-                if (currentApp == null) {
-                    Toast.makeText(requireContext(), "应用信息不存在", Toast.LENGTH_SHORT).show()
-                    return@HistoryVersionAdapter
-                }
-                val historyAppInfo = currentApp.copy(
-                    versionId = historyVersion.versionId,
-                    versionName = historyVersion.versionName,
-                    description = historyVersion.apkPath,
-                    installState = historyVersion.installState // Pass the correct install state
-                )
-                AppDetailActivity.startWithAppInfo(requireContext(), historyAppInfo)
+                viewModel.selectHistoryVersion(historyVersion)
             }
         )
         binding.recyclerHistory.adapter = adapter

@@ -1,20 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--<layer-list xmlns:android="http://schemas.android.com/apk/res/android">-->
+
+<!--    <item android:id="@android:id/background">-->
+<!--        <shape android:shape="rectangle">-->
+<!--            <corners android:radius="4dp" />-->
+<!--            <solid android:color="@android:color/transparent" />-->
+<!--        </shape>-->
+<!--    </item>-->
+
+<!--    <item android:id="@android:id/progress">-->
+<!--        <clip>-->
+<!--            <shape android:shape="rectangle">-->
+<!--                <corners android:radius="4dp" />-->
+<!--                <solid android:color="@color/blue_action" />-->
+<!--            </shape>-->
+<!--        </clip>-->
+<!--    </item>-->
+
+<!--</layer-list>-->
+
+<!-- res/drawable/bg_download_status_progress.xml -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 进度条的背景（这里设为透明，因为外部已有白色背景） -->
     <item android:id="@android:id/background">
-        <shape android:shape="rectangle">
-            <corners android:radius="16dp" />
+        <shape>
+            <!-- 必须设置和外部边框完全一样的圆角，否则会被裁剪 -->
+            <corners android:radius="4dp" />
             <solid android:color="@android:color/transparent" />
         </shape>
     </item>
 
+    <!-- 进度条的前景（会从左到右填充的颜色） -->
     <item android:id="@android:id/progress">
+        <!-- 使用 ClipDrawable 来实现进度填充效果 -->
         <clip>
-            <shape android:shape="rectangle">
+            <shape>
                 <corners android:radius="4dp" />
-                <solid android:color="@color/blue_action" />
+
+
+                <solid android:color="@color/download_progress_fill" />
             </shape>
         </clip>
     </item>
 
 </layer-list>
+

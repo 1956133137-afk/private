@@ -70,17 +70,20 @@
                         android:layout_height="match_parent"
                         android:indeterminate="false"
                         android:max="100"
+                        android:progress="50"
                         app:indicatorSize="24dp"
                         app:trackThickness="2dp"
                         app:indicatorInset="0dp"
-                        android:visibility="gone" />
+                        app:indicatorColor="@color/blue_action"
+                        app:trackColor="@color/white"
+                        android:visibility="visible" />
 
                     <ImageView
                         android:id="@+id/ivDownloadManager"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:layout_gravity="center"
-                        android:src="@drawable/ic_download"
+                        android:src="@{viewModel.isDownloadInProgress ? @drawable/bg_apk_a : @drawable/ic_download}"
                         android:contentDescription="@null" />
 
                     <View
@@ -89,7 +92,7 @@
                         android:layout_height="6dp"
                         android:layout_gravity="end|top"
                         android:background="@drawable/bg_red_dot"
-                        android:visibility="gone" />
+                        android:visibility="@{viewModel.downloadFinishedDotVisible ? View.VISIBLE : View.GONE}" />
                 </FrameLayout>
 
                 <ImageView
@@ -152,7 +155,9 @@
                     app:tabIndicatorFullWidth="false"
                     app:tabIndicatorColor="@color/blue_action"
                     app:tabIndicatorHeight="3dp"
-                    app:tabSelectedTextColor="@color/blue_action"
+                    app:tabSelectedTextColor="@color/black"
+                    app:tabTextAppearance="@style/TabTextAppearance.Bold"
+
                     app:tabTextColor="@color/text_secondary"
                     app:tabRippleColor="@android:color/transparent"
                     app:layout_constraintTop_toTopOf="parent"

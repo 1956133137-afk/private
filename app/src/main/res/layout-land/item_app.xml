@@ -17,7 +17,9 @@
         android:layout_width="match_parent"
         android:layout_height="84dp"
         android:paddingVertical="6dp"
-        android:layout_margin="5dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="3dp"
+        android:layout_marginEnd="3dp"
         android:background="@drawable/bg_home_progress_capsule_lan">
 
         <ImageView
@@ -145,7 +147,7 @@
                 android:layout_gravity="center"
                 android:text='@{app.progressText}'
                 android:textSize="13sp"
-                android:textColor="@color/blue_action"
+                android:textColor="@color/black"
                 tools:text="16.3%" />
 
         </FrameLayout>

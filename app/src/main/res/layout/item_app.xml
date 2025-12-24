@@ -81,23 +81,24 @@
         <!-- 右侧操作按钮（安装 / 升级 / 打开） -->
         <Button
             android:id="@+id/btnAction"
-            android:layout_width="wrap_content"
-            android:layout_height="35dp"
-            android:minWidth="78dp"
-            android:layout_marginEnd="4dp"
+            android:layout_width="65dp"
+            android:layout_height="25dp"
+            android:layout_marginEnd="14dp"
 
 
             app:backgroundTint="@null"
 
+            android:paddingStart="1dp"
+            android:paddingEnd="1dp"
+            android:paddingTop="1dp"
+            android:paddingBottom="1dp"
+
 
             android:text='@{app.buttonText}'
-            android:textSize="13sp"
+            android:textSize="11sp"
             android:textAllCaps="false"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
             android:fontFamily="sans-serif-medium"
             android:includeFontPadding="false"
-            android:gravity="center"
             android:singleLine="true"
             android:ellipsize="none"
 
@@ -113,8 +114,7 @@
         <FrameLayout
             android:id="@+id/layoutProgress"
             android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_marginEnd="4dp"
+            android:layout_height="25dp"
             android:background="@drawable/bg_home_progress_capsule"
             android:onClick="@{clickListener}"
             android:clickable="true"
@@ -132,7 +132,6 @@
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:max="100"
                 android:progress='@{app.progress}'
                 android:indeterminate="false"
                 android:progressDrawable="@drawable/bg_home_progress_bar"
@@ -145,7 +144,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text='@{app.progressText}'
-                android:textSize="13sp"
+                android:textSize="11sp"
                 android:textColor="@color/black"
                 tools:text="16.3%" />
 

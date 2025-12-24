@@ -25,6 +25,11 @@ class AppDetailViewModel : ViewModel() {
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
 
+    private val _switchToTab = MutableLiveData<Int>()
+    val switchToTab: LiveData<Int> = _switchToTab
+
+    val isHistoryTabSelected = MutableLiveData<Boolean>(false)
+
     private val historyVersionCache = mutableMapOf<String, List<HistoryVersion>>()
 
     // ✅ 历史版本详情：保存“你点击的那一条版本信息”（版本号/版本ID/安装状态）
@@ -71,13 +76,25 @@ class AppDetailViewModel : ViewModel() {
         loadApp(app.packageName)
     }
 
+    fun selectHistoryVersion(historyVersion: HistoryVersion) {
+        val currentApp = baseFromRepo ?: return
+        val historyAppInfo = currentApp.copy(
+            versionId = historyVersion.versionId,
+            versionName = historyVersion.versionName,
+            description = historyVersion.apkPath, // Use apkPath as description for history version
+            installState = historyVersion.installState
+        )
+        setHistoryAppInfo(historyAppInfo)
+        _switchToTab.value = 0 // Request to switch to the first tab
+    }
+
     private fun recomputeAppInfo() {
         val base = baseFromRepo ?: return
         val override = historyOverride
 
         // 最新版本详情
         if (override == null) {
-            _appInfo.value = base
+            _appInfo.value = base.copy(isHistory = false)
             return
         }
 
@@ -98,7 +115,8 @@ class AppDetailViewModel : ViewModel() {
 
             // ✅ 下载状态/进度使用该历史版本对应的队列项（如果存在）
             downloadStatus = statusSource.downloadStatus,
-            progress = statusSource.progress
+            progress = statusSource.progress,
+            isHistory = true
         )
     }
 

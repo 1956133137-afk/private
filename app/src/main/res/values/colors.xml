@@ -19,6 +19,9 @@
 
     <color name="blue_action_light">#E3F2FF</color>
 
+
+
+    <color name="download_progress_fill">#80B3E5FC</color>
     <!-- 红色系 -->
     <color name="crimson">#DC143C</color>      <!-- 深红 -->
     <color name="coral">#FF7F50</color>        <!-- 珊瑚红 -->
