@@ -22,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.Locale
 
 object AppRepository {
 
@@ -75,6 +76,19 @@ object AppRepository {
         }
     }
 
+    // 新增：格式化字节大小
+    private fun formatSize(bytes: Long): String {
+        if (bytes <= 0) return "0B"
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
+        return String.format(
+            Locale.US,
+            "%.2f%s",
+            bytes / Math.pow(1024.0, digitGroups.toDouble()),
+            units[digitGroups]
+        )
+    }
+
     private fun taskKey(appId: String, versionId: Long): String = "$appId@$versionId"
 
     private fun taskKey(app: AppInfo): String? {
@@ -85,7 +99,7 @@ object AppRepository {
     private fun updateAppStatus(
         appId: String,
         versionId: Long?,
-        updateMasterList: Boolean, // ★ 控制是否更新主列表
+        updateMasterList: Boolean,
         transform: (AppInfo) -> AppInfo
     ) {
         synchronized(stateLock) {
@@ -206,7 +220,9 @@ object AppRepository {
                     apkPath = entity.savePath,
                     installState = InstallState.NOT_INSTALLED,
                     versionName = "已暂停", releaseDate = "",
-                    downloadStatus = status, progress = finalProgress
+                    downloadStatus = status, progress = finalProgress,
+                    currentSizeStr = "",
+                    totalSizeStr = ""
                 )
             }.filter { it.downloadStatus != DownloadStatus.NONE }
 
@@ -245,12 +261,9 @@ object AppRepository {
             LogUtil.d(TAG, "Received response for app list, category: ${category?.id}")
 
             if (response.code == 200 && response.data != null) {
-                LogUtil.d(TAG, "Response successful, data count: ${response.data.size}")
                 val distinctList = response.data
                     .groupBy { it.appId }
                     .map { (_, apps) -> apps.maxByOrNull { it.id ?: -1 }!! }
-
-                LogUtil.d(TAG, "Distinct list size: ${distinctList.size}")
 
                 synchronized(stateLock) {
                     val localAppsMap = localAllApps.associateBy { it.appId }
@@ -292,7 +305,9 @@ object AppRepository {
                             baseInfo.copy(
                                 downloadStatus = it.downloadStatus,
                                 progress = it.progress,
-                                apkPath = it.apkPath
+                                apkPath = it.apkPath,
+                                currentSizeStr = it.currentSizeStr,
+                                totalSizeStr = it.totalSizeStr
                             )
                         } ?: baseInfo
                     }
@@ -326,7 +341,9 @@ object AppRepository {
             versionName = response.version ?: "N/A",
             releaseDate = response.updateTime ?: response.createTime,
             downloadStatus = localApp?.downloadStatus ?: DownloadStatus.NONE,
-            progress = localApp?.progress ?: 0
+            progress = localApp?.progress ?: 0,
+            currentSizeStr = localApp?.currentSizeStr ?: "",
+            totalSizeStr = localApp?.totalSizeStr ?: ""
         )
     }
 
@@ -382,10 +399,20 @@ object AppRepository {
                     throw IllegalStateException("Download URL is blank for versionId $versionId")
                 }
 
+                // 修改点：处理回调的 3 个参数
                 val installedPackageName = XcServiceManager.downloadAndInstall(
                     appId = app.appId, versionId = versionId, url = realApkPath,
-                    onProgress = { percent ->
-                        updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(progress = percent) }
+                    onProgress = { percent, currentBytes, totalBytes ->
+                        val currentStr = formatSize(currentBytes)
+                        val totalStr = formatSize(totalBytes)
+
+                        updateAppStatus(app.appId, versionId, isLatestVersion) {
+                            it.copy(
+                                progress = percent,
+                                currentSizeStr = currentStr,
+                                totalSizeStr = totalStr
+                            )
+                        }
                     }
                 )
 
@@ -398,14 +425,15 @@ object AppRepository {
                 val latestVersionId = masterAppInfo?.versionId ?: app.versionId
                 val newInstallState = if (versionId < latestVersionId) InstallState.INSTALLED_OLD else InstallState.INSTALLED_LATEST
 
-                // ★ 安装成功后，无论如何都要更新主列表
                 updateAppStatus(app.appId, versionId, true) {
                     it.copy(
                         downloadStatus = DownloadStatus.NONE,
                         progress = 0,
                         installState = newInstallState,
                         packageName = installedPackageName,
-                        isInstalled = true
+                        isInstalled = true,
+                        currentSizeStr = "",
+                        totalSizeStr = ""
                     )
                 }
 
@@ -483,7 +511,12 @@ object AppRepository {
 
         removeFromDownloadQueue(key)
         updateAppStatus(app.appId, versionId, isLatestVersion) {
-            it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
+            it.copy(
+                downloadStatus = DownloadStatus.NONE,
+                progress = 0,
+                currentSizeStr = "",
+                totalSizeStr = ""
+            )
         }
     }
 

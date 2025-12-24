@@ -39,11 +39,12 @@ object XcServiceManager {
         }
     }
 
+    // 修改点：增加 currentBytes 和 totalBytes 参数
     suspend fun downloadAndInstall(
         appId: String,
         versionId: Long,
         url: String,
-        onProgress: ((Int) -> Unit)?
+        onProgress: ((progress: Int, currentBytes: Long, totalBytes: Long) -> Unit)?
     ): String? = withContext(Dispatchers.IO) {
         try {
             val file = downloadApkWithResume(appId, versionId, url, onProgress) ?: return@withContext null
@@ -76,16 +77,12 @@ object XcServiceManager {
         }
     }
 
-    /**
-     *  修复点：
-     * - 网络异常抛出而不是返回null，防止误删文件
-     * - 仅在 416 或服务器不支持 Range 时删除文件重试
-     */
+    // 修改点：同步修改签名
     private suspend fun downloadApkWithResume(
         appId: String,
         versionId: Long,
         url: String,
-        onProgress: ((Int) -> Unit)?
+        onProgress: ((progress: Int, currentBytes: Long, totalBytes: Long) -> Unit)?
     ): File? {
         val client = OkHttpClient()
         val fileName = "${appId}_${versionId}.apk"
@@ -109,7 +106,6 @@ object XcServiceManager {
                 response = client.newCall(request).execute()
                 LogUtil.d(TAG, "[Resume] Server responded with code: ${response.code}")
 
-                //  416：Range 无效，返回 null 交给外层做“删文件重试”
                 if (response.code == 416) {
                     LogUtil.w(TAG, "[Resume] Server returned 416. Range not satisfiable.")
                     return null
@@ -119,12 +115,9 @@ object XcServiceManager {
 
                 if (!response.isSuccessful && !isResumable) {
                     LogUtil.e(TAG, "Download failed: Server returned unsuccessful code ${response.code}")
-                    // 如果是服务器端严重错误(5xx)，也抛出异常以保留当前进度（视情况而定），或者返回null重试
-                    // 这里假设非成功且非断点续传就是一个失败，但如果是网络中断，应该抛出异常
                     return null
                 }
 
-                // 如果带了 Range 但服务器没给 206/Content-Range，说明不支持 resume：删文件重下
                 if (file.exists() && downloadedBytes > 0 && !isResumable) {
                     LogUtil.w(TAG, "[Resume] Server does not support resume (sent code ${response.code}). Restarting download.")
                     file.delete()
@@ -153,11 +146,13 @@ object XcServiceManager {
                             currentBytes += bytesRead
                             if (totalBytes > 0) {
                                 val progress = ((currentBytes * 100) / totalBytes).toInt()
-                                withContext(Dispatchers.Main) { onProgress?.invoke(progress) }
+                                // 修改点：回调详细字节数到主线程
+                                withContext(Dispatchers.Main) {
+                                    onProgress?.invoke(progress, currentBytes, totalBytes)
+                                }
                             }
                         }
 
-                        //  修复：如果下载不完整，抛出 IOException，而不是返回 null
                         if (currentBytes < totalBytes && totalBytes > 0) {
                             val msg = "Download incomplete. Expected $totalBytes but got $currentBytes."
                             LogUtil.e(TAG, msg)
@@ -170,12 +165,10 @@ object XcServiceManager {
                 return file
 
             } catch (e: Exception) {
-                //  如果是取消，直接抛出
                 if (e is CancellationException) {
                     LogUtil.d(TAG, "Download cancelled (no retry).")
                     throw e
                 }
-                //  修复：网络异常/IO异常抛出，以便外层保留文件
                 LogUtil.e(TAG, "Exception during download: ${e.message}", e)
                 throw e
             } finally {
@@ -183,25 +176,20 @@ object XcServiceManager {
             }
         }
 
-        // 1) 先按“断点续传”尝试（带 Range）
         try {
             val first = executeDownload(allowRange = true)
             if (first != null) return first
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            //  捕获网络异常，保留文件，返回 null 让 Task 变为 PAUSED
             LogUtil.e(TAG, "[Resume] Network error during resume, preserving file. Error: ${e.message}")
             return null
         }
 
-        // 2) 只有在 executeDownload 明确返回 null (如 416) 时才删除文件
         if (file.exists()) {
             LogUtil.w(TAG, "[Resume] Retry: deleting local file and downloading from scratch.")
             file.delete()
         }
 
-        // 3) 第二次：全量下载（不带 Range）
-        // 这里不需要 try-catch，因为如果再次网络失败，异常抛给 downloadAndInstall 也是正确的（会变为 PAUSED）
         return executeDownload(allowRange = false)
     }
 

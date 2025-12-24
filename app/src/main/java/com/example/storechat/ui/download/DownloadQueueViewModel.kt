@@ -18,13 +18,13 @@ class DownloadQueueViewModel : ViewModel() {
                 app = app,
                 progress = app.progress,
                 speed = "",
-                downloadedSize = "",
-                totalSize = app.size,
+                downloadedSize = app.currentSizeStr, // 修改
+                totalSize = if (app.totalSizeStr.isNotEmpty()) app.totalSizeStr else app.size, // 修改：优先用实时总大小
                 status = app.downloadStatus
             )
         }
     }
-    
+
     fun onStatusClick() {
         activeTask.value?.let { AppRepository.toggleDownload(it.app) }
     }
@@ -45,9 +45,9 @@ class DownloadQueueViewModel : ViewModel() {
                 id = index.toLong(),
                 app = app,
                 progress = app.progress,
-                speed = "", 
-                downloadedSize = "",
-                totalSize = app.size,
+                speed = "",
+                downloadedSize = app.currentSizeStr, // 修改：绑定实时大小
+                totalSize = if (app.totalSizeStr.isNotEmpty()) app.totalSizeStr else app.size, // 修改：绑定总大小
                 status = app.downloadStatus
             )
         }

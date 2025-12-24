@@ -27,7 +27,11 @@ data class AppInfo(
     val downloadStatus: DownloadStatus = DownloadStatus.NONE,
     val progress: Int = 0,
     var isInstalled: Boolean = false,
-    val isHistory: Boolean = false
+    val isHistory: Boolean = false,
+
+    // --- 新增字段：用于实时显示下载大小，默认值为空字符串 ---
+    val currentSizeStr: String = "",
+    val totalSizeStr: String = ""
 ) : Serializable {
 
     init {
@@ -41,7 +45,7 @@ data class AppInfo(
     val buttonText: String
         get() = when (downloadStatus) {
             DownloadStatus.DOWNLOADING -> "暂停"
-            DownloadStatus.PAUSED -> "重试" // Changed from "继续" to "重试"
+            DownloadStatus.PAUSED -> "重试"
             DownloadStatus.VERIFYING -> "验证中"
             DownloadStatus.INSTALLING -> "安装中"
             DownloadStatus.NONE -> when (installState) {
@@ -54,7 +58,7 @@ data class AppInfo(
     val buttonEnabled: Boolean
         get() = when (downloadStatus) {
             DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> false
-            else -> true // Button is always enabled unless verifying or installing
+            else -> true
         }
 
     val showProgress: Boolean
@@ -72,11 +76,12 @@ data class AppInfo(
     val progressText: String
         get() = when (downloadStatus) {
             DownloadStatus.DOWNLOADING -> "$progress%"
-            DownloadStatus.PAUSED      -> "已暂停" // Changed from "继续" to "已暂停"
+            DownloadStatus.PAUSED      -> "已暂停"
             DownloadStatus.VERIFYING   -> "验证中"
             DownloadStatus.INSTALLING  -> "安装中"
             DownloadStatus.NONE        -> ""
         }
+
     val formattedReleaseDate: String
         get() = if (releaseDate.contains(' ')) {
             releaseDate.substring(0, releaseDate.indexOf(' '))
