@@ -50,21 +50,6 @@
             app:layout_constraintStart_toStartOf="@id/tvAppName"
             tools:text="1.8 MB/s" />
 
-        <ProgressBar
-            android:id="@+id/progressBar"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="0dp"
-            android:layout_height="4dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:progress="@{task.progress}"
-            android:max="100"
-            android:progressDrawable="@drawable/bg_btn_progress_bar"
-            app:layout_constraintTop_toBottomOf="@id/tvSpeed"
-            app:layout_constraintStart_toStartOf="@id/tvAppName"
-            app:layout_constraintEnd_toStartOf="@id/tvSizeInfo"
-            app_layout_constraintBottom_toBottomOf="@id/ivAppIcon" />
-
         <TextView
             android:id="@+id/tvSizeInfo"
             android:layout_width="wrap_content"
@@ -72,14 +57,26 @@
             android:text="@{task.downloadedSize + '/' + task.totalSize}"
             android:textColor="@color/text_secondary"
             android:textSize="11sp"
-            app:layout_constraintBottom_toBottomOf="@id/progressBar"
-            app:layout_constraintEnd_toStartOf="@id/ivCancelDownload"
-            app:layout_constraintTop_toTopOf="@id/progressBar"
-            app:layout_constraintVertical_bias="0.0"
+            app:layout_constraintBaseline_toBaselineOf="@id/tvSpeed"
+            app:layout_constraintEnd_toStartOf="@id/ivCancel"
             tools:text="1.8MB/83.00MB" />
 
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="4dp"
+            android:layout_marginTop="4dp"
+            android:progress="@{task.progress}"
+            android:max="100"
+            android:progressDrawable="@drawable/bg_btn_progress_bar"
+            app:layout_constraintTop_toBottomOf="@id/tvSpeed"
+            app:layout_constraintStart_toStartOf="@id/tvAppName"
+            app:layout_constraintEnd_toEndOf="@id/tvSizeInfo"
+            app:layout_constraintBottom_toBottomOf="@id/ivAppIcon" />
+
         <ImageView
-            android:id="@+id/ivCancelDownload"
+            android:id="@+id/ivCancel"
             android:layout_width="16dp"
             android:layout_height="16dp"
             android:layout_marginEnd="8dp"
@@ -113,12 +110,11 @@
 
             <TextView
                 android:id="@+id/tvStatus"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
                 android:gravity="center"
                 android:text="@{task.rightText}"
-                android:textColorLink="@android:color/black"
-
                 android:textColor="@color/black"
                 android:textSize="12sp"
                 tools:text="16.3%" />
