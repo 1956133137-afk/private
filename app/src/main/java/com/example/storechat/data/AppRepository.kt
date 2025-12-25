@@ -20,6 +20,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
@@ -217,6 +219,7 @@ object AppRepository {
                     name = entity.name,
                     appId = entity.appId,
                     versionId = entity.versionId,
+                    versionCode = null, // Not available in DB
                     category = AppCategory.values().find { it.id == entity.categoryId } ?: AppCategory.YANNUO,
                     createTime = null, updateTime = null, remark = null, description = "",
                     size = "N/A", downloadCount = 0,
@@ -247,7 +250,7 @@ object AppRepository {
 
             val restoredQueue = entities.map { entity ->
                 var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
-                // 如果数据库记录是“下载中”，重启APP或重进页面应视为“暂停”
+                // 如果数据库记录是"下载中"，重启APP或重进页面应视为"暂停"
                 if (status == DownloadStatus.DOWNLOADING) {
                     status = DownloadStatus.PAUSED
                 }
@@ -265,6 +268,7 @@ object AppRepository {
                     name = entity.name,
                     appId = entity.appId,
                     versionId = entity.versionId,
+                    versionCode = null, // Not available in DB
                     category = AppCategory.values().find { it.id == entity.categoryId } ?: AppCategory.YANNUO,
                     createTime = null, updateTime = null, remark = null, description = "",
                     size = "N/A", downloadCount = 0,
@@ -382,10 +386,12 @@ object AppRepository {
             name = response.productName,
             appId = response.appId,
             versionId = response.id?.toLong(),
+            versionCode = response.versionCode?.toIntOrNull(),
             category = AppCategory.from(response.appCategory) ?: AppCategory.YANNUO,
             createTime = response.createTime, updateTime = response.updateTime, remark = response.remark,
             description = response.versionDesc ?: "",
-            size = "N/A", downloadCount = 0,
+            size = localApp?.size ?: "N/A", // 使用本地应用信息中的大小，如果没有则保持"N/A"
+            downloadCount = 0,
             packageName = response.appId, apkPath = "",
             installState = localApp?.installState ?: InstallState.NOT_INSTALLED,
             versionName = response.version ?: "N/A",
@@ -397,18 +403,50 @@ object AppRepository {
         )
     }
 
-    private suspend fun resolveDownloadApkPath(appId: String, versionId: Long): String {
+    private suspend fun resolveDownloadApkPath(appId: String, versionId: Long): Pair<String, Long> {
         return try {
             val response = apiService.getDownloadUrl(GetDownloadUrlRequest(appId = appId, id = versionId))
             if (response.code == 200 && response.data != null) {
-                response.data.fileUrl
+                val fileSize = response.data.fileSize ?: getFileSizeFromUrl(response.data.fileUrl)
+                response.data.fileUrl to fileSize
             } else {
                 LogUtil.e(TAG, "API error getting download link: ${response.msg}")
-                ""
+                "" to 0L
             }
         } catch (e: Exception) {
             LogUtil.e(TAG, "Failed to resolve download URL for versionId: $versionId", e)
-            ""
+            "" to 0L
+        }
+    }
+
+    private suspend fun getFileSizeFromUrl(url: String): Long {
+        if (url.isBlank()) return 0L
+        return try {
+            val client = OkHttpClient()
+            val request = Request.Builder().url(url).head().build()
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                response.header("Content-Length")?.toLongOrNull() ?: 0L
+            } else {
+                0L
+            }
+        } catch (e: IOException) {
+            LogUtil.e(TAG, "Failed to get file size for url: $url", e)
+            0L
+        }
+    }
+
+    fun fetchAndSetAppSize(appInfo: AppInfo) {
+        if (appInfo.versionId == null) return
+
+        coroutineScope.launch {
+            val (_, fileSize) = resolveDownloadApkPath(appInfo.appId, appInfo.versionId)
+            if (fileSize > 0) {
+                val formattedSize = formatSize(fileSize)
+                updateAppStatus(appInfo.appId, appInfo.versionId, true) {
+                    it.copy(size = formattedSize)
+                }
+            }
         }
     }
 
@@ -444,14 +482,22 @@ object AppRepository {
 
         val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
             try {
-                val realApkPath = resolveDownloadApkPath(app.appId, versionId)
+                val (realApkPath, fileSize) = resolveDownloadApkPath(app.appId, versionId)
                 if (realApkPath.isBlank()) {
                     throw IllegalStateException("Download URL is blank for versionId $versionId")
                 }
 
-                // 修改点：处理回调的 3 个参数
+                if (fileSize > 0) {
+                    updateAppStatus(app.appId, versionId, isLatestVersion) {
+                        it.copy(size = formatSize(fileSize))
+                    }
+                }
+
                 val installedPackageName = XcServiceManager.downloadAndInstall(
-                    appId = app.appId, versionId = versionId, url = realApkPath,
+                    appId = app.appId,
+                    versionId = versionId,
+                    newVersionCode = app.versionCode ?: -1, // Pass the new version code
+                    url = realApkPath,
                     onProgress = { percent, currentBytes, totalBytes ->
                         val currentStr = formatSize(currentBytes)
                         val totalStr = formatSize(totalBytes)
@@ -472,11 +518,11 @@ object AppRepository {
 
                 AppPackageNameCache.saveMapping(app.appId, app.name, installedPackageName)
 
-                val latestVersionId = masterAppInfo?.versionId ?: app.versionId
-                val newInstallState = if (versionId < latestVersionId) InstallState.INSTALLED_OLD else InstallState.INSTALLED_LATEST
+                updateAppStatus(app.appId, versionId, true) { currentApp ->
+                    val latestVid = currentApp.versionId ?: app.versionId ?: -1L
+                    val newInstallState = if (versionId < latestVid) InstallState.INSTALLED_OLD else InstallState.INSTALLED_LATEST
 
-                updateAppStatus(app.appId, versionId, true) {
-                    it.copy(
+                    currentApp.copy(
                         downloadStatus = DownloadStatus.NONE,
                         progress = 0,
                         installState = newInstallState,
@@ -487,7 +533,10 @@ object AppRepository {
                     )
                 }
 
-                addToRecentInstalled(app.copy(installState = newInstallState, packageName = installedPackageName))
+                val finalState = if (versionId < (localAllApps.find { it.appId == app.appId }?.versionId ?: versionId))
+                    InstallState.INSTALLED_OLD else InstallState.INSTALLED_LATEST
+
+                addToRecentInstalled(app.copy(installState = finalState, packageName = installedPackageName))
 
                 downloadJobs.remove(key)
                 removeFromDownloadQueue(key)
@@ -501,13 +550,12 @@ object AppRepository {
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed for ${app.name}", e)
 
-                // 【优化】根据异常类型给出提示
                 val errorMsg = if (e is IOException) {
                     "网络连接中断，下载已暂停"
                 } else {
                     "下载出错，请重试"
                 }
-                eventMessage.postValue(errorMsg) // 发送消息给 UI
+                eventMessage.postValue(errorMsg)
                 updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                 downloadJobs.remove(key)
             }

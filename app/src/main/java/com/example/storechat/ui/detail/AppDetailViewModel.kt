@@ -67,6 +67,13 @@ class AppDetailViewModel : ViewModel() {
     fun setAppInfo(app: AppInfo) {
         historyOverride = null
         loadApp(app.packageName)
+        loadAppSize(app)
+    }
+
+    private fun loadAppSize(app: AppInfo) {
+        if (app.size == "N/A") {
+            AppRepository.fetchAndSetAppSize(app)
+        }
     }
 
     /**

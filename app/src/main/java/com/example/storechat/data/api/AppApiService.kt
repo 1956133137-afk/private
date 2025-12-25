@@ -71,7 +71,8 @@ data class DownloadLinkData(
     val status: Int,
     val createTime: String,
     val updateTime: String,
-    val remark: String?
+    val remark: String?,
+    val fileSize: Long? = null
 )
 
 // --- History Version --- //

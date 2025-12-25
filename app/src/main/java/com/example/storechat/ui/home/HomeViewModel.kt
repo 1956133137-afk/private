@@ -40,6 +40,8 @@ class HomeViewModel : ViewModel() {
 
     private var timeoutJob: Job? = null
 
+    private val sizeFetchTracker = mutableSetOf<String>()
+
     // ============ 首页内联搜索（横屏用） ============
 
     private val _searchKeyword = MutableLiveData("")
@@ -94,6 +96,8 @@ class HomeViewModel : ViewModel() {
                 _isLoading.value = false
                 _showNetworkError.value = false
 
+                fetchSizesForList(list)
+
                 val kw = _searchKeyword.value.orEmpty()
                 _appsMediator.value = filterApps(list, kw)
             }
@@ -102,6 +106,15 @@ class HomeViewModel : ViewModel() {
 
         _appsMediator.addSource(_searchKeyword) { kw ->
             _appsMediator.value = filterApps(AppRepository.categorizedApps.value, kw)
+        }
+    }
+
+    private fun fetchSizesForList(apps: List<AppInfo>) {
+        apps.forEach { app ->
+            if (app.size == "N/A" && !sizeFetchTracker.contains(app.appId)) {
+                sizeFetchTracker.add(app.appId)
+                AppRepository.fetchAndSetAppSize(app)
+            }
         }
     }
 

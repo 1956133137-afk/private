@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.storechat.databinding.ItemRecentAppBinding
 import com.example.storechat.databinding.ItemRecentAppLandBinding
 import com.example.storechat.model.AppInfo
+import com.example.storechat.util.AppUtils
 
 // 定义视图类型常量：竖屏模式
 private const val VIEW_TYPE_PORTRAIT = 1
@@ -95,11 +96,16 @@ class DownloadRecentAdapter(private val onItemClick: (AppInfo) -> Unit) :
         // 获取当前位置的数据项
         val item = getItem(position)
         // 调用ViewHolder的bind方法绑定数据
-        holder.bind(item)
+        holder.bind(item, onItemClick)
         // 设置项点击监听器
-        holder.itemView.setOnClickListener { onItemClick(item) }
+        holder.itemView.setOnClickListener {
+            val context = it.context
+            if (!AppUtils.launchApp(context, item.packageName)) {
+                // 如果无法打开应用，执行 onItemClick 回调
+                onItemClick(item)
+            }
+        }
     }
-
     /**
      * ViewHolder内部类，用于持有列表项视图
      * @param binding ViewDataBinding实例，可能是ItemRecentAppBinding或ItemRecentAppLandBinding
@@ -108,11 +114,39 @@ class DownloadRecentAdapter(private val onItemClick: (AppInfo) -> Unit) :
         /**
          * 绑定应用数据到视图
          * @param app AppInfo数据对象
+         * @param onItemClick 点击回调
          */
-        fun bind(app: AppInfo) {
+        fun bind(app: AppInfo, onItemClick: (AppInfo) -> Unit) {
             when (binding) {
-                is ItemRecentAppBinding -> binding.app = app
-                is ItemRecentAppLandBinding -> binding.app = app
+                is ItemRecentAppBinding -> {
+                    binding.app = app
+                    // 为竖屏布局的按钮更新文本为"打开"，如果应用已安装
+                    val context = binding.root.context
+                    val isInstalled = AppUtils.getInstalledVersionCode(context, app.packageName) != -1L
+                    binding.btnInstall.text = if (isInstalled) "打开" else "详情"
+                    // 为按钮设置点击事件，打开应用
+                    binding.btnInstall.setOnClickListener {
+                        if (!AppUtils.launchApp(context, app.packageName)) {
+                            // 如果无法打开应用，执行 onItemClick 回调
+                            onItemClick(app)
+                        }
+                    }
+                    // 为应用图标设置点击事件，跳转到应用详情页面
+                    binding.ivAppIcon.setOnClickListener {
+                        onItemClick(app)
+                    }
+                }
+                is ItemRecentAppLandBinding -> {
+                    binding.app = app
+                    // 为横屏布局设置点击事件，打开应用
+                    binding.root.setOnClickListener {
+                        val context = binding.root.context
+                        if (!AppUtils.launchApp(context, app.packageName)) {
+                            // 如果无法打开应用，执行 onItemClick 回调
+                            onItemClick(app)
+                        }
+                    }
+                }
             }
             binding.executePendingBindings()
         }

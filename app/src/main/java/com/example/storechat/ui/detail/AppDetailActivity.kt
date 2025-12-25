@@ -47,7 +47,10 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         }
 
         if (appInfo != null) {
-            viewModel.setHistoryAppInfo(appInfo)
+            // ** THE FIX IS HERE **
+            // We should use setAppInfo, which is designed to handle the initial setup.
+            // Using setHistoryAppInfo incorrectly triggers the history override logic.
+            viewModel.setAppInfo(appInfo)
         } else {
             val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME)
             if (packageName == null) {

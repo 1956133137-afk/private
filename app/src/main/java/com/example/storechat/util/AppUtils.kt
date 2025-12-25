@@ -23,4 +23,33 @@ object AppUtils {
             -1L
         }
     }
+
+    /**
+     * 检查应用是否已安装
+     */
+//    fun isAppInstalled(context: Context, packageName: String): Boolean {
+//        return getInstalledVersionCode(context, packageName) != -1L
+//    }
+
+    /**
+     * 打开已安装的应用
+     * @param context 上下文
+     * @param packageName 应用包名
+     * @return 是否成功打开应用
+     */
+    fun launchApp(context: Context, packageName: String): Boolean {
+        return try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 }
