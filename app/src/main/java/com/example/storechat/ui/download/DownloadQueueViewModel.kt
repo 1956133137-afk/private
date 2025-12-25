@@ -10,6 +10,9 @@ import com.example.storechat.model.DownloadTask
 
 class DownloadQueueViewModel : ViewModel() {
 
+    // 监听 Repository 的全局事件消息
+    val eventMessage: LiveData<String> = AppRepository.eventMessage
+
     // region Data for Landscape (Single Task) - DEPRECATED but kept for compatibility
     val activeTask: LiveData<DownloadTask?> = AppRepository.downloadQueue.map { queue ->
         queue.firstOrNull()?.let { app ->
@@ -76,6 +79,9 @@ class DownloadQueueViewModel : ViewModel() {
 
     fun onToastMessageShown() {
         _toastMessage.value = null
+    }
+    fun refreshDataFromDb() {
+        AppRepository.reloadTasksFromDb()
     }
     // endregion
 }

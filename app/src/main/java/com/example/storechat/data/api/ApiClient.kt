@@ -41,15 +41,15 @@ object ApiClient {
             .addInterceptor(SignInterceptor())
             .addInterceptor(loggingInterceptor)
 
-            // ✅ 总超时（防止某些请求挂住很久）
+            //  总超时（防止某些请求挂住很久）
             .callTimeout(20, TimeUnit.SECONDS)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
 
             // 你现有的 SSL 绕过保留 :contentReference[oaicite:2]{index=2}
-            .sslSocketFactory(UnsafeClient.sslSocketFactory, UnsafeClient.trustManager)
-            .hostnameVerifier { _, _ -> true }
+//            .sslSocketFactory(UnsafeClient.sslSocketFactory, UnsafeClient.trustManager)
+//            .hostnameVerifier { _, _ -> true }
             .build()
     }
 

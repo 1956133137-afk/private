@@ -48,6 +48,10 @@ class DownloadQueueFragment : Fragment() {
         // 初始化时根据当前数据刷新一次卡片显示
         updateCardState()
     }
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshDataFromDb()
+    }
 
     private fun setupRecyclerView() {
         // 最近安装列表（竖屏/横屏都可能存在，所以用安全调用）
@@ -100,6 +104,12 @@ class DownloadQueueFragment : Fragment() {
             if (message != null) {
                 Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
                 viewModel.onToastMessageShown()
+            }
+        }
+        // 【新增】观察 Repository 发出的事件消息（如网络中断）
+        viewModel.eventMessage.observe(viewLifecycleOwner) { message ->
+            if (!message.isNullOrEmpty()) {
+                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
             }
         }
 

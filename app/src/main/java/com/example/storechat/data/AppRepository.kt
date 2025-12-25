@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.Locale
 
@@ -61,6 +62,9 @@ object AppRepository {
 
     private val _checkUpdateResult = MutableLiveData<UpdateStatus?>()
     val checkUpdateResult: LiveData<UpdateStatus?> = _checkUpdateResult
+
+    // 新增：用于发送一次性消息（如错误提示）给 ViewModel
+    val eventMessage = MutableLiveData<String>()
 
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
@@ -235,6 +239,52 @@ object AppRepository {
         }
     }
 
+    fun reloadTasksFromDb() {
+        if (!::downloadDao.isInitialized) return
+
+        coroutineScope.launch {
+            val entities = downloadDao.getAllTasks()
+
+            val restoredQueue = entities.map { entity ->
+                var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
+                // 如果数据库记录是“下载中”，重启APP或重进页面应视为“暂停”
+                if (status == DownloadStatus.DOWNLOADING) {
+                    status = DownloadStatus.PAUSED
+                }
+
+                // 检查文件是否存在
+                if (status == DownloadStatus.PAUSED && entity.savePath.isNotEmpty()) {
+                    if (!File(entity.savePath).exists()) {
+                        status = DownloadStatus.NONE
+                    }
+                }
+
+                val finalProgress = if (status == DownloadStatus.NONE) 0 else entity.progress
+
+                AppInfo(
+                    name = entity.name,
+                    appId = entity.appId,
+                    versionId = entity.versionId,
+                    category = AppCategory.values().find { it.id == entity.categoryId } ?: AppCategory.YANNUO,
+                    createTime = null, updateTime = null, remark = null, description = "",
+                    size = "N/A", downloadCount = 0,
+                    packageName = entity.packageName,
+                    apkPath = entity.savePath,
+                    installState = InstallState.NOT_INSTALLED,
+                    versionName = "已暂停", releaseDate = "",
+                    downloadStatus = status, progress = finalProgress,
+                    currentSizeStr = "",
+                    totalSizeStr = ""
+                )
+            }.filter { it.downloadStatus != DownloadStatus.NONE }
+
+            synchronized(stateLock) {
+                localDownloadQueue = restoredQueue
+                _downloadQueue.postValue(localDownloadQueue)
+            }
+            LogUtil.d(TAG, "Reloaded ${localDownloadQueue.size} tasks from DB.")
+        }
+    }
     fun selectCategory(context: Context, category: AppCategory) {
         _selectedCategory.postValue(category)
         requestAppList(context, category)
@@ -450,6 +500,14 @@ object AppRepository {
 
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed for ${app.name}", e)
+
+                // 【优化】根据异常类型给出提示
+                val errorMsg = if (e is IOException) {
+                    "网络连接中断，下载已暂停"
+                } else {
+                    "下载出错，请重试"
+                }
+                eventMessage.postValue(errorMsg) // 发送消息给 UI
                 updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                 downloadJobs.remove(key)
             }
