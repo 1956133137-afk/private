@@ -83,7 +83,7 @@ object AppRepository {
         val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
         return String.format(
             Locale.US,
-            "%.2f%s",
+            "%.1f%s",
             bytes / Math.pow(1024.0, digitGroups.toDouble()),
             units[digitGroups]
         )

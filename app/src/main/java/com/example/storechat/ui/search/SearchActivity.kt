@@ -3,7 +3,9 @@ package com.example.storechat.ui.search
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
@@ -35,9 +37,12 @@ class SearchActivity : AppCompatActivity() {
         observeViewModel()
 
         val initialQuery = intent.getStringExtra(EXTRA_QUERY)
+        // 修正：增加非空判断逻辑
         if (!initialQuery.isNullOrEmpty() && initialQuery != "null") {
             binding.etQuery.setText(initialQuery)
-            viewModel.search(initialQuery)
+            // 移动光标到末尾
+            binding.etQuery.setSelection(initialQuery.length)
+            performSearch()
         }
     }
 
@@ -66,14 +71,28 @@ class SearchActivity : AppCompatActivity() {
     }
 
     private fun performSearch() {
-        viewModel.search(binding.etQuery.text.toString())
+        val query = binding.etQuery.text.toString().trim()
+        if (query.isNotEmpty()) {
+            // ★ 优化：搜索时自动收起软键盘，避免遮挡结果
+            hideKeyboard()
+            viewModel.search(query)
+        }
     }
 
     private fun observeViewModel() {
         viewModel.result.observe(this) { list ->
             adapter.submitList(list)
-            // 可以添加一个空状态的显示逻辑
-            binding.tvVersion?.isVisible = list.isEmpty()
+
+            // ★ 优化：根据结果控制 空状态 和 列表 的显示/隐藏
+            val isEmpty = list.isEmpty()
+            // 如果 query 为空（初始状态），也不显示空页面，只有搜了没结果才显示
+            val hasQuery = !binding.etQuery.text.isNullOrEmpty()
+
+            binding.layoutEmptyState?.isVisible = isEmpty && hasQuery
+            binding.recyclerSearchResult.isVisible = !isEmpty
+
+            // 版本号始终显示，或者根据需求处理
+            binding.tvVersion?.isVisible = true
         }
 
         viewModel.checkUpdateResult.observe(this) { status ->
@@ -95,6 +114,15 @@ class SearchActivity : AppCompatActivity() {
                 }
                 viewModel.onNavigationComplete()
             }
+        }
+    }
+
+    // ★ 新增辅助方法：收起软键盘
+    private fun hideKeyboard() {
+        val view = this.currentFocus
+        if (view != null) {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(view.windowToken, 0)
         }
     }
 
