@@ -131,6 +131,7 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
             tab.customView = customView
         }.attach()
 
+        // 确保 onTabSelected 只有以下逻辑，不要额外添加重置数据的代码
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 tab?.customView?.isSelected = true

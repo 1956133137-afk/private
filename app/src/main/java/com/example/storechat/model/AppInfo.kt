@@ -71,7 +71,7 @@ data class AppInfo(
         }
 
     val showButton: Boolean
-        get() = !showProgress && !isHistory
+        get() = !showProgress
 
     val progressText: String
         get() = when (downloadStatus) {

@@ -9,6 +9,7 @@ import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import com.example.storechat.data.AppRepository
 import com.example.storechat.model.AppInfo
+import com.example.storechat.model.DownloadStatus
 import com.example.storechat.model.HistoryVersion
 import kotlinx.coroutines.launch
 
@@ -32,14 +33,14 @@ class AppDetailViewModel : ViewModel() {
 
     private val historyVersionCache = mutableMapOf<String, List<HistoryVersion>>()
 
-    // ✅ 历史版本详情：保存“你点击的那一条版本信息”（版本号/版本ID/安装状态）
+    //  历史版本详情：保存“你点击的那一条版本信息”（版本号/版本ID/安装状态）
     private var historyOverride: AppInfo? = null
 
-    // ✅ 缓存：最新版本基础信息（来自 allApps）
+    //  缓存：最新版本基础信息（来自 allApps）
     private var baseFromRepo: AppInfo? = null
 
     init {
-        // ✅ 监听下载队列变化：用于刷新“历史版本”的按钮状态（下载中/暂停/进度）
+        //  监听下载队列变化：用于刷新“历史版本”的按钮状态（下载中/暂停/进度）
         _appInfo.addSource(AppRepository.downloadQueue) {
             recomputeAppInfo()
         }
@@ -69,22 +70,35 @@ class AppDetailViewModel : ViewModel() {
     }
 
     /**
-     * ✅ 历史版本详情：展示该版本的 installState + 下载状态（按 packageName+versionId）
+     * 历史版本详情：展示该版本的 installState + 下载状态（按 packageName+versionId）
      */
     fun setHistoryAppInfo(app: AppInfo) {
         historyOverride = app
-        loadApp(app.packageName)
+        // 【关键修复】如果当前已经有基础数据且包名一致，不要重新 loadApp，
+        // 而是直接重新计算并应用 historyOverride。这样可以避免异步加载导致的数据闪烁或重置。
+        if (baseFromRepo != null && baseFromRepo?.packageName == app.packageName) {
+            recomputeAppInfo()
+        } else {
+            loadApp(app.packageName)
+        }
     }
 
     fun selectHistoryVersion(historyVersion: HistoryVersion) {
         val currentApp = baseFromRepo ?: return
+        // 构造一个临时的 AppInfo，携带历史版本的信息
         val historyAppInfo = currentApp.copy(
             versionId = historyVersion.versionId,
             versionName = historyVersion.versionName,
-            description = historyVersion.apkPath, // Use apkPath as description for history version
-            installState = historyVersion.installState
+            // 如果历史版本有独立的描述，可以在这里设置；否则暂时用 apkPath 或保持原描述
+            description = historyVersion.apkPath,
+            installState = historyVersion.installState,
+            downloadStatus = DownloadStatus.NONE,progress = 0
         )
+
+        // 设置覆盖信息
         setHistoryAppInfo(historyAppInfo)
+
+        // 切换到 Tab 0 (详情页)
         _switchToTab.value = 0 // Request to switch to the first tab
     }
 
@@ -98,24 +112,26 @@ class AppDetailViewModel : ViewModel() {
             return
         }
 
-        // ✅ 历史版本详情：去 downloadQueue 找到该版本的实时下载状态/进度
+        // 2. 如果有历史版本覆盖，显示历史版本详情 (isHistory = true)
+        // 尝试在下载队列中找到这个历史版本（通过 versionId 匹配）
         val queueItemForThisVersion = AppRepository.downloadQueue.value
             ?.firstOrNull { it.packageName == base.packageName && it.versionId == override.versionId }
 
+        // 状态优先级：队列中的状态 > 传入的历史记录状态
         val statusSource = queueItemForThisVersion ?: override
 
         _appInfo.value = base.copy(
-            // 版本信息必须使用历史版本
+            // 核心信息使用 override (历史版本)
             versionId = override.versionId,
             versionName = override.versionName,
             description = override.description,
-
-            // ✅ 安装状态也必须使用历史版本（从历史列表传进来）
             installState = override.installState,
 
-            // ✅ 下载状态/进度使用该历史版本对应的队列项（如果存在）
+            // 下载状态使用 statusSource (可能是下载队列中的实时状态)
             downloadStatus = statusSource.downloadStatus,
             progress = statusSource.progress,
+
+            // 标记为历史查看模式
             isHistory = true
         )
     }

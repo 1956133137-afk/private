@@ -39,7 +39,7 @@ class HistoryVersionAdapter(
 
     companion object DiffCallback : DiffUtil.ItemCallback<HistoryVersion>() {
         override fun areItemsTheSame(oldItem: HistoryVersion, newItem: HistoryVersion): Boolean =
-            oldItem.apkPath == newItem.apkPath
+            oldItem.versionId == newItem.versionId
 
         override fun areContentsTheSame(oldItem: HistoryVersion, newItem: HistoryVersion): Boolean =
             oldItem == newItem
