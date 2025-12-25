@@ -248,10 +248,32 @@ object AppRepository {
         coroutineScope.launch {
             val entities = downloadDao.getAllTasks()
 
+            // 【关键修改】获取当前内存中正在运行的任务的快照
+            // 为了避免数据库的旧状态（或"暂停"状态）覆盖掉内存中正在下载的实时状态
+            val runningTasksSnapshot = synchronized(stateLock) {
+                localDownloadQueue.filter {
+                    val key = taskKey(it)
+                    key != null && downloadJobs.containsKey(key)
+                }.associateBy { taskKey(it) }
+            }
+
             val restoredQueue = entities.map { entity ->
+                val key = entity.taskKey
+
+                // 1. 如果该任务在内存中正在运行，直接使用内存中的对象（保留实时进度和状态）
+                val runningTask = if (key != null) runningTasksSnapshot[key] else null
+
+                if (runningTask != null) {
+                    return@map runningTask
+                }
+
+                // 2. 否则从数据库恢复
                 var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
-                // 如果数据库记录是"下载中"，重启APP或重进页面应视为"暂停"
-                if (status == DownloadStatus.DOWNLOADING) {
+
+                // 双重检查：如果数据库记录是"下载中"，但当前并没有在运行该Job，才将其置为"暂停"
+                // 这样避免了"明明在下载，刷新数据库却变暂停"的问题
+                val isJobRunning = key != null && downloadJobs.containsKey(key)
+                if (status == DownloadStatus.DOWNLOADING && !isJobRunning) {
                     status = DownloadStatus.PAUSED
                 }
 

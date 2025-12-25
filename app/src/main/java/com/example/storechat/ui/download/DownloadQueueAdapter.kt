@@ -46,10 +46,9 @@ class DownloadQueueAdapter(private val viewModel: DownloadQueueViewModel) :
                 else -> R.drawable.bg_download_status_progress
             }
 
-            // 这就是你原来那行：现在不会再爆红了
+            // 【关键修复】先设置 Drawable，再设置 Progress，解决列表刷新时的显示Bug
+            binding.statusProgress.progressDrawable = ContextCompat.getDrawable(ctx, drawableRes)
             binding.statusProgress.progress = task.progress
-            binding.statusProgress.progressDrawable =
-                ContextCompat.getDrawable(ctx, drawableRes)
 
             // 验证中 / 安装中：不显示内部填充，只保留白底蓝边
             binding.statusProgress.visibility = when (task.status) {
@@ -65,7 +64,10 @@ class DownloadQueueAdapter(private val viewModel: DownloadQueueViewModel) :
 
             // 按钮控制暂停 / 继续
             binding.tvStatus.setOnClickListener {
-                viewModel.onStatusClick(task)
+                // 【修改】增加防重复点击检查
+                if (task.statusButtonEnabled) {
+                    viewModel.onStatusClick(task)
+                }
             }
 
             binding.executePendingBindings()

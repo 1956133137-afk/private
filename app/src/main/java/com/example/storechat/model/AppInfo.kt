@@ -46,7 +46,8 @@ data class AppInfo(
     val buttonText: String
         get() = when (downloadStatus) {
             DownloadStatus.DOWNLOADING -> "暂停"
-            DownloadStatus.PAUSED -> "重试"
+            // 【修改】统一改为 "继续"，原为 "重试"
+            DownloadStatus.PAUSED -> "继续"
             DownloadStatus.VERIFYING -> "验证中"
             DownloadStatus.INSTALLING -> "安装中"
             DownloadStatus.NONE -> when (installState) {
@@ -77,7 +78,8 @@ data class AppInfo(
     val progressText: String
         get() = when (downloadStatus) {
             DownloadStatus.DOWNLOADING -> "$progress%"
-            DownloadStatus.PAUSED      -> "已暂停"
+            // 【修改】统一改为 "继续"
+            DownloadStatus.PAUSED      -> "继续"
             DownloadStatus.VERIFYING   -> "验证中"
             DownloadStatus.INSTALLING  -> "安装中"
             DownloadStatus.NONE        -> ""
