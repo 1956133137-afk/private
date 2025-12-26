@@ -9,8 +9,11 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <application
+        android:name=".StoreChatApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -31,13 +34,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- ★ AndroidAutoSize 屏幕适配插件配置 -->
-        <!-- 设计图基准宽度 -->
-        <!--        <meta-data-->
-        <!--            android:name="design_width_in_dp"-->
-        <!--            android:value="570" />-->
-
-
         <meta-data
             android:name="design_width_in_dp"
             android:value="411" />
@@ -45,20 +41,19 @@
             android:name="design_height_in_dp"
             android:value="731" />
 
-
-
-        <!--  切换为“默认关闭，手动开启”的混合适配模式 -->
         <meta-data
             android:name="autosize_is_adapting_by_default"
             android:value="true" />
 
+        <meta-data
+            android:name="autosize_log"
+            android:value="false" />
 
         <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

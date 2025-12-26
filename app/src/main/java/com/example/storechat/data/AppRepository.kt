@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -35,15 +36,12 @@ object AppRepository {
     private lateinit var downloadDao: DownloadDao
 
     private val downloadJobs = ConcurrentHashMap<String, Job>()
-
     private val refreshJobs = ConcurrentHashMap<Int, Job>()
     private val lastFetchAt = ConcurrentHashMap<Int, Long>()
     private const val MIN_FETCH_INTERVAL_MS = 1500L
 
     private val cancellationsForDeletion = ConcurrentHashMap.newKeySet<String>()
-
     private val apiService = ApiClient.appApi
-
     private val stateLock = Any()
 
     private var localAllApps: List<AppInfo> = emptyList()
@@ -65,12 +63,9 @@ object AppRepository {
     private val _checkUpdateResult = MutableLiveData<UpdateStatus?>()
     val checkUpdateResult: LiveData<UpdateStatus?> = _checkUpdateResult
 
-    // 新增：用于发送一次性消息（如错误提示）给 ViewModel
     val eventMessage = MutableLiveData<String>()
-
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
-
     private val _selectedCategory = MutableLiveData(AppCategory.YANNUO)
 
     val categorizedApps: LiveData<List<AppInfo>> = MediatorLiveData<List<AppInfo>>().apply {
@@ -82,7 +77,6 @@ object AppRepository {
         }
     }
 
-    // 新增：格式化字节大小
     private fun formatSize(bytes: Long): String {
         if (bytes <= 0) return "0B"
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
@@ -96,7 +90,6 @@ object AppRepository {
     }
 
     private fun taskKey(appId: String, versionId: Long): String = "$appId@$versionId"
-
     private fun taskKey(app: AppInfo): String? {
         val vid = app.versionId ?: return null
         return taskKey(app.appId, vid)
@@ -110,7 +103,6 @@ object AppRepository {
     ) {
         synchronized(stateLock) {
             val key = versionId?.let { taskKey(appId, it) }
-
             var masterAppUpdated = false
             if (updateMasterList) {
                 localAllApps = localAllApps.map {
@@ -146,7 +138,6 @@ object AppRepository {
         coroutineScope.launch {
             val vid = app.versionId ?: return@launch
             val key = taskKey(app.appId, vid)
-
             val entity = DownloadEntity(
                 taskKey = key,
                 appId = app.appId,
@@ -178,7 +169,6 @@ object AppRepository {
         synchronized(stateLock) {
             localDownloadQueue = localDownloadQueue.filterNot { taskKey(it) == taskKey }
             _downloadQueue.postValue(localDownloadQueue)
-
             coroutineScope.launch {
                 downloadDao.deleteTask(taskKey)
             }
@@ -195,31 +185,39 @@ object AppRepository {
     }
 
     fun initialize(context: Context) {
+        // 【核心修复】1. 正确初始化工具类
+        AppPackageNameCache.init(context)
+        XcServiceManager.init(context)
+
         val db = AppDatabase.getDatabase(context)
         downloadDao = db.downloadDao()
 
+        // 【核心修复】2. 串行化初始化流程：先扫描已安装应用 -> 再请求服务器列表
+        // 这样确保在请求列表时，本地缓存已经有了包名映射，从而能正确识别已安装状态
         coroutineScope.launch {
-            val entities = downloadDao.getAllTasks()
+            // 2.1 扫描已安装应用 (在 IO 线程执行)
+            withContext(Dispatchers.IO) {
+                AppPackageNameCache.scanInstalledPackages(context)
+            }
 
+            // 2.2 恢复下载任务
+            val entities = downloadDao.getAllTasks()
             val restoredQueue = entities.map { entity ->
                 var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
                 if (status == DownloadStatus.DOWNLOADING) {
                     status = DownloadStatus.PAUSED
                 }
-
                 if (status == DownloadStatus.PAUSED && entity.savePath.isNotEmpty()) {
                     if (!File(entity.savePath).exists()) {
                         status = DownloadStatus.NONE
                     }
                 }
-
                 val finalProgress = if (status == DownloadStatus.NONE) 0 else entity.progress
-
                 AppInfo(
                     name = entity.name,
                     appId = entity.appId,
                     versionId = entity.versionId,
-                    versionCode = null, // Not available in DB
+                    versionCode = null,
                     category = AppCategory.values().find { it.id == entity.categoryId } ?: AppCategory.YANNUO,
                     createTime = null, updateTime = null, remark = null, description = "",
                     size = "N/A", downloadCount = 0,
@@ -238,18 +236,15 @@ object AppRepository {
                 _downloadQueue.postValue(localDownloadQueue)
             }
 
+            // 2.3 缓存建立完成后，请求服务器列表
             requestAppList(context, AppCategory.YANNUO)
         }
     }
 
     fun reloadTasksFromDb() {
         if (!::downloadDao.isInitialized) return
-
         coroutineScope.launch {
             val entities = downloadDao.getAllTasks()
-
-            // 【关键修改】获取当前内存中正在运行的任务的快照
-            // 为了避免数据库的旧状态（或"暂停"状态）覆盖掉内存中正在下载的实时状态
             val runningTasksSnapshot = synchronized(stateLock) {
                 localDownloadQueue.filter {
                     val key = taskKey(it)
@@ -259,38 +254,26 @@ object AppRepository {
 
             val restoredQueue = entities.map { entity ->
                 val key = entity.taskKey
-
-                // 1. 如果该任务在内存中正在运行，直接使用内存中的对象（保留实时进度和状态）
                 val runningTask = if (key != null) runningTasksSnapshot[key] else null
+                if (runningTask != null) return@map runningTask
 
-                if (runningTask != null) {
-                    return@map runningTask
-                }
-
-                // 2. 否则从数据库恢复
                 var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
-
-                // 双重检查：如果数据库记录是"下载中"，但当前并没有在运行该Job，才将其置为"暂停"
-                // 这样避免了"明明在下载，刷新数据库却变暂停"的问题
                 val isJobRunning = key != null && downloadJobs.containsKey(key)
                 if (status == DownloadStatus.DOWNLOADING && !isJobRunning) {
                     status = DownloadStatus.PAUSED
                 }
-
-                // 检查文件是否存在
                 if (status == DownloadStatus.PAUSED && entity.savePath.isNotEmpty()) {
                     if (!File(entity.savePath).exists()) {
                         status = DownloadStatus.NONE
                     }
                 }
-
                 val finalProgress = if (status == DownloadStatus.NONE) 0 else entity.progress
 
                 AppInfo(
                     name = entity.name,
                     appId = entity.appId,
                     versionId = entity.versionId,
-                    versionCode = null, // Not available in DB
+                    versionCode = null,
                     category = AppCategory.values().find { it.id == entity.categoryId } ?: AppCategory.YANNUO,
                     createTime = null, updateTime = null, remark = null, description = "",
                     size = "N/A", downloadCount = 0,
@@ -308,9 +291,9 @@ object AppRepository {
                 localDownloadQueue = restoredQueue
                 _downloadQueue.postValue(localDownloadQueue)
             }
-            LogUtil.d(TAG, "Reloaded ${localDownloadQueue.size} tasks from DB.")
         }
     }
+
     fun selectCategory(context: Context, category: AppCategory) {
         _selectedCategory.postValue(category)
         requestAppList(context, category)
@@ -319,7 +302,6 @@ object AppRepository {
     private fun requestAppList(context: Context, category: AppCategory) {
         val key = category.id
         val now = System.currentTimeMillis()
-
         if (now - (lastFetchAt[key] ?: 0L) < MIN_FETCH_INTERVAL_MS) return
         if (refreshJobs[key]?.isActive == true) return
 
@@ -332,10 +314,7 @@ object AppRepository {
     private suspend fun refreshAppsFromServer(context: Context, category: AppCategory?) {
         _isLoading.postValue(true)
         try {
-            LogUtil.d(TAG, "Starting request for app list, category: ${category?.id}")
             val response = apiService.getAppList(AppListRequestBody(appCategory = category?.id))
-            LogUtil.d(TAG, "Received response for app list, category: ${category?.id}")
-
             if (response.code == 200 && response.data != null) {
                 val distinctList = response.data
                     .groupBy { it.appId }
@@ -343,10 +322,10 @@ object AppRepository {
 
                 synchronized(stateLock) {
                     val localAppsMap = localAllApps.associateBy { it.appId }
-
                     val mergedRemoteList = distinctList.map { serverApp ->
                         val localApp = localAppsMap[serverApp.appId]
 
+                        // 此时缓存应已通过 scanInstalledPackages 填充
                         var realPackageName = AppPackageNameCache.getPackageNameByAppId(serverApp.appId)
                         if (realPackageName == null) {
                             realPackageName = AppPackageNameCache.getPackageNameByName(serverApp.productName)
@@ -360,7 +339,6 @@ object AppRepository {
                         val isInstalled = installedVersionCode != -1L
 
                         val serverVersionCode = serverApp.versionCode?.toLongOrNull()
-
                         val installState = when {
                             !isInstalled -> InstallState.NOT_INSTALLED
                             serverVersionCode != null && serverVersionCode > installedVersionCode -> InstallState.INSTALLED_OLD
@@ -394,11 +372,10 @@ object AppRepository {
                 }
                 _isLoading.postValue(false)
             } else {
-                LogUtil.w(TAG, "Response not successful, code: ${response.code}, message: ${response.msg}")
                 _allApps.postValue(localAllApps.filter { it.category == category })
             }
         } catch (e: Exception) {
-            LogUtil.e(TAG, "Error refreshing apps from server", e)
+            e.printStackTrace()
             _allApps.postValue(localAllApps.filter { it.category == category })
         }
     }
@@ -412,7 +389,7 @@ object AppRepository {
             category = AppCategory.from(response.appCategory) ?: AppCategory.YANNUO,
             createTime = response.createTime, updateTime = response.updateTime, remark = response.remark,
             description = response.versionDesc ?: "",
-            size = localApp?.size ?: "N/A", // 使用本地应用信息中的大小，如果没有则保持"N/A"
+            size = localApp?.size ?: "N/A",
             downloadCount = 0,
             packageName = response.appId, apkPath = "",
             installState = localApp?.installState ?: InstallState.NOT_INSTALLED,
@@ -432,11 +409,9 @@ object AppRepository {
                 val fileSize = response.data.fileSize ?: getFileSizeFromUrl(response.data.fileUrl)
                 response.data.fileUrl to fileSize
             } else {
-                LogUtil.e(TAG, "API error getting download link: ${response.msg}")
                 "" to 0L
             }
         } catch (e: Exception) {
-            LogUtil.e(TAG, "Failed to resolve download URL for versionId: $versionId", e)
             "" to 0L
         }
     }
@@ -453,14 +428,12 @@ object AppRepository {
                 0L
             }
         } catch (e: IOException) {
-            LogUtil.e(TAG, "Failed to get file size for url: $url", e)
             0L
         }
     }
 
     fun fetchAndSetAppSize(appInfo: AppInfo) {
         if (appInfo.versionId == null) return
-
         coroutineScope.launch {
             val (_, fileSize) = resolveDownloadApkPath(appInfo.appId, appInfo.versionId)
             if (fileSize > 0) {
@@ -475,7 +448,7 @@ object AppRepository {
     fun toggleDownload(app: AppInfo) {
         val versionId = app.versionId
         if (versionId == null) {
-            LogUtil.e(TAG, "Cannot download ${app.name}, versionId is null.")
+            eventMessage.postValue("此应用暂无可用版本，无法下载")
             return
         }
 
@@ -505,9 +478,7 @@ object AppRepository {
         val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
             try {
                 val (realApkPath, fileSize) = resolveDownloadApkPath(app.appId, versionId)
-                if (realApkPath.isBlank()) {
-                    throw IllegalStateException("Download URL is blank for versionId $versionId")
-                }
+                if (realApkPath.isBlank()) throw IllegalStateException("URL blank")
 
                 if (fileSize > 0) {
                     updateAppStatus(app.appId, versionId, isLatestVersion) {
@@ -518,65 +489,75 @@ object AppRepository {
                 val installedPackageName = XcServiceManager.downloadAndInstall(
                     appId = app.appId,
                     versionId = versionId,
-                    newVersionCode = app.versionCode ?: -1, // Pass the new version code
+                    newVersionCode = app.versionCode ?: -1,
                     url = realApkPath,
                     onProgress = { percent, currentBytes, totalBytes ->
                         val currentStr = formatSize(currentBytes)
                         val totalStr = formatSize(totalBytes)
-
                         updateAppStatus(app.appId, versionId, isLatestVersion) {
-                            it.copy(
-                                progress = percent,
-                                currentSizeStr = currentStr,
-                                totalSizeStr = totalStr
-                            )
+                            it.copy(progress = percent, currentSizeStr = currentStr, totalSizeStr = totalStr)
                         }
                     }
                 )
 
-                if (installedPackageName == null) {
-                    throw IllegalStateException("Download or install failed for ${app.name}")
-                }
+                if (installedPackageName == null) throw IllegalStateException("Install failed")
 
                 AppPackageNameCache.saveMapping(app.appId, app.name, installedPackageName)
-
-                updateAppStatus(app.appId, versionId, true) { currentApp ->
-                    val latestVid = currentApp.versionId ?: app.versionId ?: -1L
-                    val newInstallState = if (versionId < latestVid) InstallState.INSTALLED_OLD else InstallState.INSTALLED_LATEST
-
-                    currentApp.copy(
-                        downloadStatus = DownloadStatus.NONE,
-                        progress = 0,
-                        installState = newInstallState,
-                        packageName = installedPackageName,
-                        isInstalled = true,
-                        currentSizeStr = "",
-                        totalSizeStr = ""
-                    )
-                }
-
-                val finalState = if (versionId < (localAllApps.find { it.appId == app.appId }?.versionId ?: versionId))
-                    InstallState.INSTALLED_OLD else InstallState.INSTALLED_LATEST
-
-                addToRecentInstalled(app.copy(installState = finalState, packageName = installedPackageName))
-
                 downloadJobs.remove(key)
-                removeFromDownloadQueue(key)
+                downloadDao.deleteTask(key)
+
+                // 【核心修复】安装成功后，原子化地更新所有相关状态
+                synchronized(stateLock) {
+                    // 1. 计算新状态
+                    val masterApp = localAllApps.find { it.appId == app.appId }
+                    val latestVid = masterApp?.versionId ?: versionId
+                    val newInstallState = if (versionId < latestVid) {
+                        InstallState.INSTALLED_OLD
+                    } else {
+                        InstallState.INSTALLED_LATEST
+                    }
+
+                    // 2. 更新所有应用列表
+                    var newlyInstalledApp: AppInfo? = null
+                    localAllApps = localAllApps.map {
+                        if (it.appId == app.appId) {
+                            it.copy(
+                                downloadStatus = DownloadStatus.NONE,
+                                progress = 0,
+                                installState = newInstallState,
+                                packageName = installedPackageName,
+                                isInstalled = true,
+                                currentSizeStr = "",
+                                totalSizeStr = ""
+                            ).also { updatedApp -> newlyInstalledApp = updatedApp }
+                        } else {
+                            it
+                        }
+                    }
+
+                    // 3. 更新最近安装列表
+                    newlyInstalledApp?.let {
+                        localRecentApps = localRecentApps.filterNot { recent -> recent.packageName == it.packageName }
+                        localRecentApps = listOf(it) + localRecentApps
+                    }
+
+                    // 4. 更新下载队列（现在应为空）
+                    localDownloadQueue = localDownloadQueue.filterNot { taskKey(it) == key }
+
+                    // 5. 一次性通知所有UI更新
+                    _allApps.postValue(localAllApps)
+                    _recentInstalledApps.postValue(localRecentApps)
+                    _downloadQueue.postValue(localDownloadQueue)
+                }
 
             } catch (e: CancellationException) {
                 if (!cancellationsForDeletion.remove(key)) {
                     updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                 }
                 downloadJobs.remove(key)
-
             } catch (e: Exception) {
-                LogUtil.e(TAG, "Download/Install failed for ${app.name}", e)
-
-                val errorMsg = if (e is IOException) {
-                    "网络连接中断，下载已暂停"
-                } else {
-                    "下载出错，请重试"
-                }
+                LogUtil.e(TAG, "Download/Install failed", e)
+                val errorMsg = if (e is IOException) "网络连接中断，下载已暂停" else " "
                 eventMessage.postValue(errorMsg)
                 updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                 downloadJobs.remove(key)
@@ -591,6 +572,7 @@ object AppRepository {
         val historyAppInfo = app.copy(
             versionId = historyVersion.versionId,
             versionName = historyVersion.versionName,
+            versionCode = historyVersion.versionCode,
             downloadStatus = DownloadStatus.NONE,
             progress = 0
         )
@@ -601,7 +583,6 @@ object AppRepository {
         return try {
             val installedVersionCode = AppUtils.getInstalledVersionCode(context, app.packageName)
             val response = apiService.getAppHistory(AppVersionHistoryRequest(appId = app.appId))
-
             if (response.code == 200 && response.data != null) {
                 response.data.map { versionItem ->
                     val state = if (versionItem.versionCode.toLongOrNull() == installedVersionCode) {
@@ -612,6 +593,7 @@ object AppRepository {
                     HistoryVersion(
                         versionId = versionItem.id,
                         versionName = versionItem.version,
+                        versionCode = versionItem.versionCode.toIntOrNull(),
                         apkPath = "",
                         installState = state
                     )
@@ -620,7 +602,6 @@ object AppRepository {
                 emptyList()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
             emptyList()
         }
     }
@@ -628,23 +609,15 @@ object AppRepository {
     fun removeDownload(app: AppInfo) {
         val versionId = app.versionId ?: return
         val key = taskKey(app.appId, versionId)
-
         val masterAppInfo = synchronized(stateLock) { localAllApps.find { it.appId == app.appId } }
         val isLatestVersion = masterAppInfo == null || versionId >= (masterAppInfo.versionId ?: -1)
 
         cancellationsForDeletion.add(key)
         downloadJobs[key]?.cancel()
-
         XcServiceManager.deleteDownloadedFile(app.appId, versionId)
-
         removeFromDownloadQueue(key)
         updateAppStatus(app.appId, versionId, isLatestVersion) {
-            it.copy(
-                downloadStatus = DownloadStatus.NONE,
-                progress = 0,
-                currentSizeStr = "",
-                totalSizeStr = ""
-            )
+            it.copy(downloadStatus = DownloadStatus.NONE, progress = 0, currentSizeStr = "", totalSizeStr = "")
         }
     }
 
@@ -660,11 +633,9 @@ object AppRepository {
             try {
                 val appId = "32DQY9LH260HX43U"
                 val currentVersion = _appVersion.value?.removePrefix("V") ?: "1.0.0"
-
                 val latestVersionInfo = apiService.checkUpdate(
                     CheckUpdateRequest(packageName = appId, currentVer = currentVersion)
                 )
-
                 if (latestVersionInfo != null && latestVersionInfo.versionName > currentVersion) {
                     _checkUpdateResult.postValue(UpdateStatus.NEW_VERSION(latestVersionInfo.versionName))
                 } else {

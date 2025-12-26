@@ -12,17 +12,18 @@ import java.util.Locale
 object LogUtil {
     private const val TAG = "LogUtil"
     private const val MAX_LOG_SIZE = 10 * 1024 * 1024 // 10MB
-    private var logFile: File? = null
+    private var logDir: File? = null
+    private val currentLogFileName = "app_log.txt"
+    private val oldLogFileName = "app_log_old.txt"
 
     fun init(context: Context) {
         try {
-            val logDir = File(context.getExternalFilesDir(null), "logs")
-            if (!logDir.exists()) {
-                logDir.mkdirs()
+            logDir = File(context.getExternalFilesDir(null), "logs")
+            if (logDir?.exists() == false) {
+                logDir?.mkdirs()
             }
-            logFile = File(logDir, "app_log.txt")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize log file", e)
+            Log.e(TAG, "Failed to initialize log directory", e)
         }
     }
 
@@ -52,24 +53,28 @@ object LogUtil {
     }
 
     private fun writeLogToFile(level: String, tag: String, message: String) {
+        logDir ?: return
         try {
-            logFile?.let { file ->
-                // Check file size and clear if too large
-                if (file.exists() && file.length() > MAX_LOG_SIZE) {
-                    file.writeText("")
+            val logFile = File(logDir, currentLogFileName)
+            // Rotate if the current log file is too large
+            if (logFile.exists() && logFile.length() > MAX_LOG_SIZE) {
+                val oldLogFile = File(logDir, oldLogFileName)
+                if (oldLogFile.exists()) {
+                    oldLogFile.delete()
                 }
+                logFile.renameTo(oldLogFile)
+            }
 
-                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
-                val logEntry = "[$timestamp] [$level] [$tag] $message\n"
-                
-                FileWriter(file, true).use { writer ->
-                    writer.append(logEntry)
-                }
+            val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+            val logEntry = "[$timestamp] [$level] [$tag] $message\n"
+            
+            FileWriter(logFile, true).use { writer ->
+                writer.append(logEntry)
             }
         } catch (e: IOException) {
             // Silent fail to avoid recursive logging
         } catch (e: Exception) {
-            // Silent fail to avoid recursive logging
+            // Silent fail
         }
     }
 }

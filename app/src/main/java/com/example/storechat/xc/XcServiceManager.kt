@@ -1,13 +1,9 @@
 package com.example.storechat.xc
 
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.widget.Toast
-import androidx.core.content.FileProvider
 import com.proembed.service.MyService
 import com.example.storechat.util.LogUtil
 import kotlinx.coroutines.*
@@ -24,10 +20,10 @@ object XcServiceManager {
     private lateinit var appContext: Context
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private const val FILE_PROVIDER_AUTHORITY = "com.example.storechat.fileprovider"
-
     fun init(context: Context) {
-        appContext = context.applicationContext
+        if (!::appContext.isInitialized) {
+            appContext = context.applicationContext
+        }
         scope.launch {
             try {
                 if (service == null) {
@@ -35,7 +31,7 @@ object XcServiceManager {
                     LogUtil.i(TAG, "Hardware service connected successfully.")
                 }
             } catch (e: Exception) {
-                LogUtil.e(TAG, "Hardware service init error. Fallback to standard installer will be used.", e)
+                LogUtil.e(TAG, "Hardware service init error.", e)
             }
         }
     }
@@ -78,64 +74,45 @@ object XcServiceManager {
             val realPackageName = info?.packageName
 
             if (realPackageName.isNullOrBlank()) {
-                LogUtil.e(TAG, "Failed to parse APK, cannot get package name.")
                 file.delete()
                 return@withContext null
             }
-            LogUtil.d(TAG, "APK parsed successfully. PackageName: $realPackageName")
 
             var isInstallSuccessful = false
-
             if (service != null) {
                 try {
-                    var canProceedToInstall = !isAppInstalled(pm, realPackageName)
-
-                    if (!canProceedToInstall) {
-                        LogUtil.d(TAG, "Old version detected. Attempting to silently uninstall $realPackageName...")
+                    if (isAppInstalled(pm, realPackageName)) {
                         service?.silentUnInstallApk(realPackageName)
-                        
-                        LogUtil.d(TAG, "Waiting 5 seconds to verify uninstallation...")
-                        delay(5000)
-
-                        if (!isAppInstalled(pm, realPackageName)) {
-                            LogUtil.d(TAG, "Silent uninstall successful.")
-                            canProceedToInstall = true
-                        } else {
-                            LogUtil.w(TAG, "Silent uninstall failed or took too long.")
+                        // 改为轮询检查，最多等待10秒
+                        for (i in 0..9) {
+                            delay(1000)
+                            if (!isAppInstalled(pm, realPackageName)) {
+                                break
+                            }
                         }
                     }
-
-                    if (canProceedToInstall) {
-                        LogUtil.d(TAG, "Attempting to silently install $realPackageName...")
+                    
+                    if (!isAppInstalled(pm, realPackageName)) {
                         service?.silentInstallApk(file.absolutePath, realPackageName, false)
-
-                        LogUtil.d(TAG, "Waiting 5 seconds to verify installation...")
-                        delay(5000)
-                        
-                        val currentVersionCode = getInstalledVersionCode(pm, realPackageName)
-                        if (currentVersionCode >= newVersionCode) {
-                            isInstallSuccessful = true
-                            LogUtil.d(TAG, "Silent install successful. New version: $currentVersionCode")
-                        } else {
-                            LogUtil.w(TAG, "Silent install verification failed. Expected: $newVersionCode, Found: $currentVersionCode")
+                        // 改为轮询检查，最多等待15秒
+                        for (i in 0..14) {
+                            delay(1000)
+                            if (getInstalledVersionCode(pm, realPackageName) >= newVersionCode) {
+                                isInstallSuccessful = true
+                                break
+                            }
                         }
                     }
                 } catch (e: Exception) {
-                    LogUtil.e(TAG, "An error occurred during silent uninstall/install process.", e)
+                    LogUtil.e(TAG, "Silent install error", e)
+                    if (e is CancellationException) throw e
                 }
-            } else {
-                 LogUtil.w(TAG, "Hardware service (MyService) not available.")
             }
 
-            if (!isInstallSuccessful) {
-                LogUtil.w(TAG, "Silent process failed. Falling back to standard installer.")
-//                promptStandardInstall(file)
-            }
-
+            if (!isInstallSuccessful) return@withContext null
             return@withContext realPackageName
 
         } catch (e: Exception) {
-            LogUtil.e(TAG, "Download and install process failed.", e)
             if (e is CancellationException) throw e
             return@withContext null
         }
@@ -153,78 +130,66 @@ object XcServiceManager {
         if (!dir.exists()) dir.mkdirs()
         val file = File(dir, fileName)
 
-        suspend fun executeDownload(allowRange: Boolean): File? {
-            val requestBuilder = Request.Builder().url(url)
-            var downloadedBytes = 0L
+        val requestBuilder = Request.Builder().url(url)
+        var downloadedBytes = 0L
 
-            if (allowRange && file.exists()) {
-                downloadedBytes = file.length()
-                requestBuilder.addHeader("Range", "bytes=$downloadedBytes-")
+        if (file.exists()) {
+            downloadedBytes = file.length()
+            requestBuilder.addHeader("Range", "bytes=$downloadedBytes-")
+        }
+
+        val request = requestBuilder.build()
+        var response: Response? = null
+        try {
+            response = client.newCall(request).execute()
+            if (response.code == 416) { // Range Not Satisfiable
+                if (file.exists() && file.length() > 0) return file
+                return null
+            }
+            if (response.code == 404) return null
+
+            val isResumable = response.code == 206
+            if (!response.isSuccessful && !isResumable) {
+                 if (file.exists()) {
+                    file.delete()
+                }
+                return null
+            }
+            
+            if (file.exists() && downloadedBytes > 0 && !isResumable) {
+                file.delete()
+                downloadedBytes = 0
             }
 
-            val request = requestBuilder.build()
-            var response: Response? = null
-            try {
-                response = client.newCall(request).execute()
-                if (response.code == 416) return null 
+            val body = response.body ?: return null
+            val contentLength = body.contentLength()
+            val totalBytes = if (contentLength == -1L) -1L else contentLength + downloadedBytes
 
-                val isResumable = response.code == 206 && response.header("Content-Range") != null
-
-                if (!response.isSuccessful && !isResumable) {
-                    return null
-                }
-
-                if (file.exists() && downloadedBytes > 0 && !isResumable) {
-                    file.delete()
-                    downloadedBytes = 0
-                }
-
-                val body = response.body ?: return null
-                val totalBytes = body.contentLength() + downloadedBytes
-
-                body.byteStream().use { inputStream ->
-                    FileOutputStream(file, downloadedBytes > 0 && isResumable).use { outputStream ->
-                        var currentBytes = downloadedBytes
-                        val buffer = ByteArray(8192)
-                        var bytesRead: Int
-
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            if (!currentCoroutineContext().isActive) throw CancellationException("Cancelled by user")
-                            
-                            outputStream.write(buffer, 0, bytesRead)
-                            currentBytes += bytesRead
-                            if (totalBytes > 0) {
-                                val progress = ((currentBytes * 100) / totalBytes).toInt()
-                                withContext(Dispatchers.Main) {
-                                    onProgress?.invoke(progress, currentBytes, totalBytes)
-                                }
+            body.byteStream().use { inputStream ->
+                FileOutputStream(file, downloadedBytes > 0 && isResumable).use { outputStream ->
+                    var currentBytes = downloadedBytes
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        if (!currentCoroutineContext().isActive) throw CancellationException()
+                        outputStream.write(buffer, 0, bytesRead)
+                        currentBytes += bytesRead
+                        if (totalBytes > 0) {
+                            val progress = ((currentBytes * 100) / totalBytes).toInt()
+                            withContext(Dispatchers.Main) {
+                                onProgress?.invoke(progress, currentBytes, totalBytes)
                             }
-                        }
-
-                        if (currentBytes < totalBytes && totalBytes > 0) {
-                             throw IOException("Download incomplete. Expected $totalBytes but got $currentBytes.")
                         }
                     }
                 }
-                return file
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                throw e
-            } finally {
-                response?.close()
             }
-        }
-
-        try {
-            val first = executeDownload(allowRange = true)
-            if (first != null) return first
+            return file
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            return null
+            throw e
+        } finally {
+            response?.close()
         }
-
-        if (file.exists()) file.delete()
-        return executeDownload(allowRange = false)
     }
 
     fun deleteDownloadedFile(appId: String, versionId: Long) {
@@ -234,29 +199,7 @@ object XcServiceManager {
                 val dir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: appContext.filesDir
                 val file = File(dir, fileName)
                 if (file.exists()) file.delete()
-            } catch (e: Exception) {
-                LogUtil.e(TAG, "Error deleting downloaded file for $appId-$versionId", e)
-            }
+            } catch (e: Exception) { }
         }
     }
-
-//    private suspend fun promptStandardInstall(apkFile: File) {
-//        withContext(Dispatchers.Main) {
-//            val intent = Intent(Intent.ACTION_VIEW)
-//            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-//                FileProvider.getUriForFile(appContext, FILE_PROVIDER_AUTHORITY, apkFile)
-//            } else {
-//                Uri.fromFile(apkFile)
-//            }
-//            intent.setDataAndType(uri, "application/vnd.android.package-archive")
-//            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-//            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-//
-//            if (appContext.packageManager.resolveActivity(intent, 0) != null) {
-//                appContext.startActivity(intent)
-//            } else {
-//                Toast.makeText(appContext, "无法打开安装器", Toast.LENGTH_SHORT).show()
-//            }
-//        }
-//    }
 }

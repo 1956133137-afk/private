@@ -33,21 +33,20 @@ class AppListAdapter(
     }
 
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
-        holder.bind(getItem(position))
+        val app = getItem(position)
+        holder.bind(app)
+        holder.itemView.setOnClickListener { onItemClick(app) }
+        holder.binding.btnAction.setOnClickListener { onActionClick(app) }
+        holder.binding.layoutProgress.setOnClickListener { onActionClick(app) }
     }
 
     inner class AppViewHolder(
-        private val binding: ItemAppBinding
+       internal val binding: ItemAppBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(app: AppInfo) {
             binding.app = app
             binding.executePendingBindings()
-
-            binding.root.setOnClickListener { onItemClick(app) }
-            binding.ivIcon?.setOnClickListener { onItemClick(app) }
-            binding.btnAction?.setOnClickListener { onActionClick(app) }
-            binding.layoutProgress?.setOnClickListener { onActionClick(app) }
         }
     }
 }

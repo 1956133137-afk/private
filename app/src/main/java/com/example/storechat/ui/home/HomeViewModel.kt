@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.storechat.data.AppRepository
 import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
+import com.example.storechat.model.DownloadStatus
 import com.example.storechat.model.InstallState
 import com.example.storechat.model.UpdateStatus
 import com.example.storechat.util.LogUtil
@@ -53,7 +54,7 @@ class HomeViewModel : ViewModel() {
     private val recentInstalled: LiveData<List<AppInfo>> = AppRepository.recentInstalledApps
 
     val isDownloadInProgress: LiveData<Boolean> =
-        downloadQueue.map { list -> !list.isNullOrEmpty() }
+        downloadQueue.map { list -> list.any { it.downloadStatus == DownloadStatus.DOWNLOADING } }
 
     val totalDownloadProgress: LiveData<Int> =
         downloadQueue.map { list ->

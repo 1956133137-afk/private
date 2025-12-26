@@ -108,9 +108,17 @@ class DownloadQueueFragment : Fragment() {
         }
         // 【新增】观察 Repository 发出的事件消息（如网络中断）
         viewModel.eventMessage.observe(viewLifecycleOwner) { message ->
-            if (!message.isNullOrEmpty()) {
-                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+            if (message.isNullOrEmpty()) return@observe
+
+            if (message == "此应用暂无可用版本，无法下载" && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                return@observe
             }
+
+            if (message == "网络连接中断，下载已暂停") {
+                return@observe
+            }
+
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
         }
 
         // 最近安装列表

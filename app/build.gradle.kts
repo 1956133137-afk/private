@@ -39,7 +39,7 @@ android {
         jvmTarget = "11"
     }
 
-    // ★ 开启 DataBinding
+    //  开启 DataBinding
     buildFeatures {
         dataBinding = true
     }
@@ -54,13 +54,13 @@ dependencies {
 
     implementation(files("libs/myservice.jar"))
 
-    // ★ MVVM 需要的
+    //  MVVM 需要的
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.lifecycle.livedata)
     implementation(libs.androidx.recyclerview)
     implementation(libs.androidx.fragment.ktx)
 
-    // ★ 屏幕适配插件
+    //  屏幕适配插件
     implementation(libs.android.autosize)
 
     testImplementation(libs.junit)
@@ -76,7 +76,7 @@ dependencies {
     //网络请求
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+    implementation(libs.okhttp.logging.interceptor)
 
 
     implementation(libs.androidx.room.runtime)

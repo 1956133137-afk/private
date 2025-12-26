@@ -46,6 +46,7 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        setupRecyclerView() // Call this first to ensure adapter is ready
         setupViews()
         observeViewModel()
 
@@ -71,16 +72,16 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun setupViews() {
+    private fun setupRecyclerView() {
         appListAdapter = AppListAdapter(
             onItemClick = { app -> openDetail(app) },
             onActionClick = { app -> viewModel.handleAppAction(app) }
         )
         binding.recyclerAppList.adapter = appListAdapter
-
-        // Disable change animations to prevent flickering on progress updates.
         binding.recyclerAppList.itemAnimator = null
+    }
 
+    private fun setupViews() {
         binding.tabLayoutCategories.apply {
             AppCategory.values().forEach { category ->
                 addTab(newTab().setText(category.title))

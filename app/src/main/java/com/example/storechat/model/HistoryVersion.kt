@@ -13,6 +13,7 @@ import java.io.Serializable
 data class HistoryVersion(
     val versionId: Long,
     val versionName: String,
+    val versionCode: Int?,
     val apkPath: String,
     var installState: InstallState = InstallState.NOT_INSTALLED
 ) : Serializable {
