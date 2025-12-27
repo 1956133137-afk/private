@@ -36,19 +36,23 @@ data class DownloadTask(
     // 右侧胶囊里显示的文字（横屏列表使用）
     val rightText: String
         get() = when (status) {
-            // 【修改】未下载/已取消时，显示“安装/升级”而不是空白，保持与首页一致的交互提示
+            // 【修改】未下载/已取消时，显示"安装/升级"而不是空白，保持与首页一致的交互提示
             DownloadStatus.NONE -> statusButtonText
-            DownloadStatus.DOWNLOADING -> progressText    // 下载中：显示百分比
-            DownloadStatus.PAUSED -> "继续"               // 暂停：显示“继续”
+            DownloadStatus.DOWNLOADING -> {
+                // 【修改】下载完成时显示"安装中"
+                if (progress >= 100) "安装中" else progressText
+            }
+            DownloadStatus.PAUSED -> "继续"               // 暂停：显示"继续"
             DownloadStatus.VERIFYING -> "验证中"          // 验证中
             DownloadStatus.INSTALLING -> "安装中"          // 安装中
         }
 
     // 按钮是否可点击（防止在验证/安装中重复点击）
     val statusButtonEnabled: Boolean
-        get() = status == DownloadStatus.DOWNLOADING ||
+        get() = (status == DownloadStatus.DOWNLOADING && progress < 100) ||
                 status == DownloadStatus.PAUSED ||
                 status == DownloadStatus.NONE
+//
 
     val progressText: String
         get() = "$progress%"

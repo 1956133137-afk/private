@@ -60,7 +60,6 @@
             android:layout_marginTop="4dp"
             android:background="@drawable/bg_btn_action"
 
-
             app:backgroundTint="@null"
             android:text='@{viewModel.appInfo.buttonText}'
             android:textColor="@android:color/white"

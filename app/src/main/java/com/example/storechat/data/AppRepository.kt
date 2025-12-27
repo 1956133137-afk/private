@@ -557,8 +557,12 @@ object AppRepository {
                 downloadJobs.remove(key)
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed", e)
-                val errorMsg = if (e is IOException) "网络连接中断，下载已暂停" else " "
-                eventMessage.postValue(errorMsg)
+                val errorMsg = if (e is IOException) "网络连接中断，下载已暂停" else null
+
+                // 只有当 errorMsg 不为 null 时才发送
+                if (errorMsg != null) {
+                    eventMessage.postValue(errorMsg)
+                }
                 updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                 downloadJobs.remove(key)
             }

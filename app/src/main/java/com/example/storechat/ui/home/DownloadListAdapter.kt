@@ -77,13 +77,25 @@ class DownloadListAdapter(
             binding.statusProgress.progress = task.progress
 
             // 只有下载中/暂停才显示进度条颜色填充，NONE(安装)/VERIFYING(验证)只显示边框
+            // 2. 设置进度条可见性 (保持你原有的逻辑)
             binding.statusProgress.visibility = when (task.status) {
                 DownloadStatus.DOWNLOADING,
                 DownloadStatus.PAUSED -> View.VISIBLE
                 else -> View.INVISIBLE
             }
-
             binding.executePendingBindings()
+            // 假设 binding.tvStatus 是那个显示状态/进度的按钮
+            if (task.status == DownloadStatus.DOWNLOADING) {
+                if (task.progress >= 100) {
+                    binding.tvStatus.text = "安装中"
+                    binding.tvStatus.isEnabled = false
+                } else {
+//                    binding.tvStatus.text = "${task.progress}%" // 或者保持 xml 定义的格式
+                    binding.tvStatus.isEnabled = true
+                }
+            }
+
+//            binding.executePendingBindings()
         }
     }
 }

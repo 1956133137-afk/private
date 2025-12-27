@@ -19,6 +19,7 @@ import com.example.storechat.R
 import com.example.storechat.data.AppRepository
 import com.example.storechat.databinding.ActivityAppDetailBinding
 import com.example.storechat.model.AppInfo
+import com.example.storechat.model.DownloadStatus
 import com.example.storechat.model.InstallState
 import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
@@ -66,7 +67,7 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
     }
 
     fun openDrawer() {
-        // 在横屏模式下，binding.drawerLayout 才不为 null
+        // 在横屏模式下，binding.drawerLayout
         binding.drawerLayout?.openDrawer(GravityCompat.END)
     }
 
@@ -113,10 +114,14 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
             }
         }
 
-        if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
-            binding.btnInstall?.setOnClickListener(clickListener)
-            binding.layoutProgress?.setOnClickListener(clickListener)
-        }
+        // 移除方向判断，为所有方向设置点击监听器
+        binding.btnInstall?.setOnClickListener(clickListener)
+        binding.layoutProgress?.setOnClickListener(clickListener)
+//
+//        if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+//            binding.btnInstall?.setOnClickListener(clickListener)
+//            binding.layoutProgress?.setOnClickListener(clickListener)
+//        }
     }
 
     private fun setupViewPagerAndTabs() {
@@ -167,7 +172,30 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         viewModel.switchToTab.observe(this) { tabIndex ->
             binding.viewPager.setCurrentItem(tabIndex, true)
         }
+        // 【新增】监听 AppInfo 变化，处理 100% 进度时的“安装中”状态
+        viewModel.appInfo.observe(this) { appInfo ->
+            if (appInfo == null) return@observe
+
+            val btn = binding.btnInstall
+            // 仅在按钮存在时操作（防止横竖屏布局差异导致为空）
+            if (btn != null) {
+                if (appInfo.downloadStatus == DownloadStatus.DOWNLOADING) {
+                    if (appInfo.progress >= 100) {
+                        // 1. 下载完成但尚未安装完成 -> 显示“安装中”
+                        btn.text = "安装中"
+                        btn.isEnabled = false // 禁止重复点击
+                    } else {
+                        // 2. 正常下载中 -> 显示进度
+                        btn.text = "${appInfo.progress}%"
+                        btn.isEnabled = true
+                    }
+                }
+                // 其他状态（如 PAUSED, NONE, INSTALLED）通常由 XML DataBinding 处理
+                // 如果发现 DataBinding 覆盖了这里的设置，可以在 else 分支强制刷新状态
+            }
+        }
     }
+
 
     companion object {
         private const val EXTRA_PACKAGE_NAME = "extra_package_name"
