@@ -145,6 +145,10 @@ class HomeFragment : Fragment() {
             binding.etSearch?.clearFocus()
             binding.etSearch?.isFocusable = false
             binding.etSearch?.isFocusableInTouchMode = false
+
+            // 添加收起键盘的逻辑
+            val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.hideSoftInputFromWindow(binding.etSearch?.windowToken, 0)
         } else {
             SearchActivity.start(requireContext(), keyword)
         }
@@ -231,7 +235,7 @@ class HomeFragment : Fragment() {
             .setNegativeButton("稍后") { dialog, _ -> dialog.dismiss() }
             .setPositiveButton("去更新") { dialog, _ ->
                 dialog.dismiss()
-                Toast.makeText(requireContext(), "这里以后接入应用商店自更新逻辑", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "这里接入应用商店自更新逻辑", Toast.LENGTH_SHORT).show()
             }
             .show()
     }

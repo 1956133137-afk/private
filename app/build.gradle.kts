@@ -53,6 +53,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
 
     implementation(files("libs/myservice.jar"))
+    implementation(files("libs/apixh.jar"))
 
     //  MVVM 需要的
     implementation(libs.androidx.lifecycle.viewmodel)

@@ -43,6 +43,8 @@ data class AppInfo(
         }
     }
 
+    val fixedDownloadCount: String = "99+"
+
     val buttonText: String
         get() = when (downloadStatus) {
             DownloadStatus.DOWNLOADING -> "暂停"

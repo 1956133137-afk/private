@@ -97,8 +97,8 @@
 
                 <ImageView
                     android:id="@+id/ivSearch"
-                    android:layout_width="48dp"
-                    android:layout_height="24dp"
+                    android:layout_width="52dp"
+                    android:layout_height="29dp"
                     android:contentDescription="@null"
                     android:src="@drawable/bg_app_service"
                     app:layout_constraintTop_toTopOf="parent"
@@ -108,8 +108,8 @@
 
                 <EditText
                     android:id="@+id/etSearch"
-                    android:layout_width="212dp"
-                    android:layout_height="24dp"
+                    android:layout_width="300dp"
+                    android:layout_height="29dp"
                     android:layout_marginEnd="0dp"
                     android:background="@drawable/bg_search_edit_text_land_no_corners"
                     android:drawablePadding="1dp"
@@ -202,7 +202,22 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
 
-            </androidx.constraintlayout.widget.ConstraintLayout></com.google.android.material.card.MaterialCardView>
-
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <!-- 横屏模式下的版本号，添加点击检测更新功能 -->
+        <TextView
+            android:id="@+id/tvVersion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:text='@{"版本号：" + viewModel.appVersion}'
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:text="版本号：V1.0.0" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

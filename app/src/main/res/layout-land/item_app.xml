@@ -60,7 +60,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text='@{"下载量| " + app.downloadCount + "   文件大小" + app.size}'
+                android:text='@{"下载量| " + app.fixedDownloadCount + "   文件大小" + app.size}'
                 android:textSize="10sp"
                 android:textColor="@color/text_secondary"
                 android:fontFamily="sans-serif"
