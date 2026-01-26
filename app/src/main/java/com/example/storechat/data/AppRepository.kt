@@ -70,6 +70,13 @@ object AppRepository {
      */
     val downloadErrorEvent = MutableLiveData<String>()
 
+    /**
+     * 清理错误事件，确保只显示一次
+     */
+    fun clearDownloadError() {
+        downloadErrorEvent.postValue("")
+    }
+
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
     private val _selectedCategory = MutableLiveData(AppCategory.YANNUO)

@@ -3,7 +3,7 @@ package com.example.storechat
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
-import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -40,14 +40,26 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
         // 检查启动 Intent，看是否需要打开抽屉
         handleIntent(intent)
 
-        // 新增：全局监听服务器错误事件
+        // 全局监听服务器错误事件
         observeDownloadErrors()
     }
 
     private fun observeDownloadErrors() {
         AppRepository.downloadErrorEvent.observe(this) { errorMessage ->
-            if (errorMessage.isNotEmpty()) {
-                Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+            if (errorMessage != null && errorMessage.isNotEmpty()) {
+                // 使用最高级别的 AlertDialog 提示，且触发一次显示一次
+                AlertDialog.Builder(this)
+                    .setTitle("下载提示")
+                    .setMessage(errorMessage)
+                    .setPositiveButton("确定") { dialog, _ ->
+                        dialog.dismiss()
+                    }
+                    .setOnDismissListener {
+                        // 显示完成后立即清理，防止重复弹出
+                        AppRepository.clearDownloadError()
+                    }
+                    .setCancelable(false) // 强制用户点击确定
+                    .show()
             }
         }
     }
