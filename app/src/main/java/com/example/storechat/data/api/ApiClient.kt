@@ -43,7 +43,7 @@ object ApiClient {
             .addInterceptor(loggingInterceptor)
 
             //  总超时（防止某些请求挂住很久）
-            .callTimeout(20, TimeUnit.SECONDS)
+            .callTimeout(40, TimeUnit.SECONDS)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)

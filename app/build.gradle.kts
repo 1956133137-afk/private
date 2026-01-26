@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.storechat"
-        minSdk = 24
+        minSdk = 22
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -50,7 +50,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    implementation(libs.androidx.activity)
+    implementation("androidx.activity:activity-ktx:1.8.2")
     implementation(libs.androidx.constraintlayout)
 
     implementation(files("libs/myservice.jar"))
@@ -60,7 +60,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.lifecycle.livedata)
     implementation(libs.androidx.recyclerview)
-    implementation(libs.androidx.fragment.ktx)
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
 
     //  屏幕适配插件
     implementation(libs.android.autosize)
