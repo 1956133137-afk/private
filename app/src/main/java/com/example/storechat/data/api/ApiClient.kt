@@ -1,6 +1,7 @@
 package com.example.storechat.data.api
 
 import android.util.Log
+import com.google.gson.GsonBuilder
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
@@ -12,7 +13,7 @@ import java.util.concurrent.TimeUnit
 object ApiClient {
 
     private const val TAG = "ApiClient"
-    private const val BASE_URL = "https://test.yannuozhineng.com/acms/api/"
+    private const val BASE_URL = "https://acms.yannuozhineng.com/api/"
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {
         HttpLoggingInterceptor(object : HttpLoggingInterceptor.Logger {
@@ -47,17 +48,16 @@ object ApiClient {
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
 
-            // 你现有的 SSL 绕过保留 :contentReference[oaicite:2]{index=2}
-//            .sslSocketFactory(UnsafeClient.sslSocketFactory, UnsafeClient.trustManager)
-//            .hostnameVerifier { _, _ -> true }
             .build()
     }
+
+    private val gson = GsonBuilder().create()
 
     val appApi: AppApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(AppApiService::class.java)
     }

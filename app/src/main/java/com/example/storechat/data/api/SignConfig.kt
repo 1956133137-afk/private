@@ -11,13 +11,13 @@ object SignConfig {
      * 应用ID
      * 用于API身份验证的唯一标识符
      */
-    const val APP_ID = "32DQY9LH260HX43U"
+    const val APP_ID = "XH2JVY4K5T4XU4IV"
     
     /**
      * 应用密钥
      * 用于API请求签名的密钥
      */
-    const val APP_SECRET = "Ask1shvYpchfi0LH4O5Hj2RfBK7VsRDOKVKri5BY8JCx60qWDC"
+    const val APP_SECRET = "hHOU7qmSiwpw5flY8yuCwPkn3zwwjHFmggFWUZICJ6so5BaDo9"
 
     /**
      * 设备唯一标识：

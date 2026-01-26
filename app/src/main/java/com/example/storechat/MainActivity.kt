@@ -3,6 +3,7 @@ package com.example.storechat
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -38,6 +39,17 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
 
         // 检查启动 Intent，看是否需要打开抽屉
         handleIntent(intent)
+
+        // 新增：全局监听服务器错误事件
+        observeDownloadErrors()
+    }
+
+    private fun observeDownloadErrors() {
+        AppRepository.downloadErrorEvent.observe(this) { errorMessage ->
+            if (errorMessage.isNotEmpty()) {
+                Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

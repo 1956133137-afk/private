@@ -64,6 +64,12 @@ object AppRepository {
     val checkUpdateResult: LiveData<UpdateStatus?> = _checkUpdateResult
 
     val eventMessage = MutableLiveData<String>()
+
+    /**
+     * 新增：专门用于通知用户服务器返回的原始错误信息
+     */
+    val downloadErrorEvent = MutableLiveData<String>()
+
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
     private val _selectedCategory = MutableLiveData(AppCategory.YANNUO)
@@ -403,16 +409,21 @@ object AppRepository {
     }
 
     private suspend fun resolveDownloadApkPath(appId: String, versionId: Long): Pair<String, Long> {
-        return try {
+        try {
             val response = apiService.getDownloadUrl(GetDownloadUrlRequest(appId = appId, id = versionId))
-            if (response.code == 200 && response.data != null) {
+            if (response.code == 200 && response.data != null && response.data.fileUrl.isNotBlank()) {
                 val fileSize = response.data.fileSize ?: getFileSizeFromUrl(response.data.fileUrl)
-                response.data.fileUrl to fileSize
+                return response.data.fileUrl to fileSize
             } else {
-                "" to 0L
+                val errorMsg = response.msg ?: "获取下载地址失败"
+                downloadErrorEvent.postValue(errorMsg)
+                throw IOException(errorMsg)
             }
         } catch (e: Exception) {
-            "" to 0L
+            if (e !is IOException) {
+                downloadErrorEvent.postValue("网络错误: ${e.message}")
+            }
+            throw e
         }
     }
 
@@ -435,12 +446,16 @@ object AppRepository {
     fun fetchAndSetAppSize(appInfo: AppInfo) {
         if (appInfo.versionId == null) return
         coroutineScope.launch {
-            val (_, fileSize) = resolveDownloadApkPath(appInfo.appId, appInfo.versionId)
-            if (fileSize > 0) {
-                val formattedSize = formatSize(fileSize)
-                updateAppStatus(appInfo.appId, appInfo.versionId, true) {
-                    it.copy(size = formattedSize)
+            try {
+                val (_, fileSize) = resolveDownloadApkPath(appInfo.appId, appInfo.versionId)
+                if (fileSize > 0) {
+                    val formattedSize = formatSize(fileSize)
+                    updateAppStatus(appInfo.appId, appInfo.versionId, true) {
+                        it.copy(size = formattedSize)
+                    }
                 }
+            } catch (e: Exception) {
+                // Ignore errors during background size fetch
             }
         }
     }
@@ -557,12 +572,8 @@ object AppRepository {
                 downloadJobs.remove(key)
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed", e)
-                val errorMsg = if (e is IOException) "网络连接中断，下载已暂停" else null
-
-                // 只有当 errorMsg 不为 null 时才发送
-                if (errorMsg != null) {
-                    eventMessage.postValue(errorMsg)
-                }
+                // This catch block now only handles the state change. 
+                // The error message is posted by the function that actually failed (e.g., resolveDownloadApkPath).
                 updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                 downloadJobs.remove(key)
             }
