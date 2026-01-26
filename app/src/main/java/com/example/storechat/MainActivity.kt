@@ -3,6 +3,7 @@ package com.example.storechat
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -47,19 +48,24 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
     private fun observeDownloadErrors() {
         AppRepository.downloadErrorEvent.observe(this) { errorMessage ->
             if (errorMessage != null && errorMessage.isNotEmpty()) {
-                // 使用最高级别的 AlertDialog 提示，且触发一次显示一次
-                AlertDialog.Builder(this)
+                val dialog = AlertDialog.Builder(this)
                     .setTitle("下载提示")
                     .setMessage(errorMessage)
-                    .setPositiveButton("确定") { dialog, _ ->
-                        dialog.dismiss()
+                    .setPositiveButton("确定") { d, _ ->
+                        d.dismiss()
                     }
                     .setOnDismissListener {
-                        // 显示完成后立即清理，防止重复弹出
                         AppRepository.clearDownloadError()
                     }
-                    .setCancelable(false) // 强制用户点击确定
+                    .setCancelable(false)
                     .show()
+
+                // 核心修改：动态设置对话框宽度
+                if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    val displayMetrics = resources.displayMetrics
+                    val width = (displayMetrics.widthPixels * 0.85).toInt()
+                    dialog.window?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+                }
             }
         }
     }

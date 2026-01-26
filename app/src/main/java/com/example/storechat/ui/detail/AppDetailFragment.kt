@@ -6,6 +6,7 @@ import android.text.method.ScrollingMovementMethod
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -70,19 +71,24 @@ class AppDetailFragment : Fragment() {
     private fun observeDownloadErrors() {
         AppRepository.downloadErrorEvent.observe(viewLifecycleOwner) { errorMessage ->
             if (errorMessage != null && errorMessage.isNotEmpty()) {
-                // 使用对话框展示最高优先级的错误信息
-                AlertDialog.Builder(requireContext())
+                val dialog = AlertDialog.Builder(requireContext())
                     .setTitle("下载提示")
                     .setMessage(errorMessage)
-                    .setPositiveButton("确定") { dialog, _ ->
-                        dialog.dismiss()
+                    .setPositiveButton("确定") { d, _ ->
+                        d.dismiss()
                     }
                     .setOnDismissListener {
-                        // 确认后清理事件，防止重复显示
                         AppRepository.clearDownloadError()
                     }
                     .setCancelable(false)
                     .show()
+
+                // 核心修改：动态设置对话框宽度
+                if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    val displayMetrics = resources.displayMetrics
+                    val width = (displayMetrics.widthPixels * 0.85).toInt()
+                    dialog.window?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+                }
             }
         }
     }

@@ -198,22 +198,17 @@ object AppRepository {
     }
 
     fun initialize(context: Context) {
-        // 【核心修复】1. 正确初始化工具类
         AppPackageNameCache.init(context)
         XcServiceManager.init(context)
 
         val db = AppDatabase.getDatabase(context)
         downloadDao = db.downloadDao()
 
-        // 【核心修复】2. 串行化初始化流程：先扫描已安装应用 -> 再请求服务器列表
-        // 这样确保在请求列表时，本地缓存已经有了包名映射，从而能正确识别已安装状态
         coroutineScope.launch {
-            // 2.1 扫描已安装应用 (在 IO 线程执行)
             withContext(Dispatchers.IO) {
                 AppPackageNameCache.scanInstalledPackages(context)
             }
 
-            // 2.2 恢复下载任务
             val entities = downloadDao.getAllTasks()
             val restoredQueue = entities.map { entity ->
                 var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
@@ -249,7 +244,6 @@ object AppRepository {
                 _downloadQueue.postValue(localDownloadQueue)
             }
 
-            // 2.3 缓存建立完成后，请求服务器列表
             requestAppList(context, AppCategory.YANNUO)
         }
     }
@@ -338,7 +332,6 @@ object AppRepository {
                     val mergedRemoteList = distinctList.map { serverApp ->
                         val localApp = localAppsMap[serverApp.appId]
 
-                        // 此时缓存应已通过 scanInstalledPackages 填充
                         var realPackageName = AppPackageNameCache.getPackageNameByAppId(serverApp.appId)
                         if (realPackageName == null) {
                             realPackageName = AppPackageNameCache.getPackageNameByName(serverApp.productName)
@@ -482,30 +475,25 @@ object AppRepository {
         val isPaused = app.downloadStatus == DownloadStatus.PAUSED
 
         if (isDownloading) {
+            LogUtil.d(TAG, "Pausing download for ${app.name}")
             downloadJobs[key]?.cancel()
             return
         }
 
-        if (isPaused) {
-            updateAppStatus(app.appId, versionId, isLatestVersion) {
-                it.copy(downloadStatus = DownloadStatus.DOWNLOADING)
-            }
-        } else {
-            addToDownloadQueue(app)
-            updateAppStatus(app.appId, versionId, isLatestVersion) {
-                it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
-            }
-        }
-
-        val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
+        val newJob = coroutineScope.launch {
             try {
                 val (realApkPath, fileSize) = resolveDownloadApkPath(app.appId, versionId)
-                if (realApkPath.isBlank()) throw IllegalStateException("URL blank")
+                if (realApkPath.isBlank()) {
+                    throw IllegalStateException("下载地址为空")
+                }
 
-                if (fileSize > 0) {
-                    updateAppStatus(app.appId, versionId, isLatestVersion) {
-                        it.copy(size = formatSize(fileSize))
-                    }
+                addToDownloadQueue(app)
+                updateAppStatus(app.appId, versionId, isLatestVersion) {
+                    it.copy(
+                        downloadStatus = DownloadStatus.DOWNLOADING,
+                        progress = if(isPaused) it.progress else 0,
+                        size = if (fileSize > 0) formatSize(fileSize) else it.size
+                    )
                 }
 
                 val installedPackageName = XcServiceManager.downloadAndInstall(
@@ -522,15 +510,15 @@ object AppRepository {
                     }
                 )
 
-                if (installedPackageName == null) throw IllegalStateException("Install failed")
+                if (installedPackageName == null) throw IllegalStateException("安装失败")
 
                 AppPackageNameCache.saveMapping(app.appId, app.name, installedPackageName)
                 downloadJobs.remove(key)
-                downloadDao.deleteTask(key)
+                removeFromDownloadQueue(key)
 
-                // 【核心修复】安装成功后，原子化地更新所有相关状态
+                XcServiceManager.deleteDownloadedFile(app.appId, versionId)
+
                 synchronized(stateLock) {
-                    // 1. 计算新状态
                     val masterApp = localAllApps.find { it.appId == app.appId }
                     val latestVid = masterApp?.versionId ?: versionId
                     val newInstallState = if (versionId < latestVid) {
@@ -539,7 +527,6 @@ object AppRepository {
                         InstallState.INSTALLED_LATEST
                     }
 
-                    // 2. 更新所有应用列表
                     var newlyInstalledApp: AppInfo? = null
                     localAllApps = localAllApps.map {
                         if (it.appId == app.appId) {
@@ -557,19 +544,13 @@ object AppRepository {
                         }
                     }
 
-                    // 3. 更新最近安装列表
                     newlyInstalledApp?.let {
                         localRecentApps = localRecentApps.filterNot { recent -> recent.packageName == it.packageName }
                         localRecentApps = listOf(it) + localRecentApps
                     }
-
-                    // 4. 更新下载队列（现在应为空）
-                    localDownloadQueue = localDownloadQueue.filterNot { taskKey(it) == key }
-
-                    // 5. 一调次性通知所有UI更新
+                    
                     _allApps.postValue(localAllApps)
                     _recentInstalledApps.postValue(localRecentApps)
-                    _downloadQueue.postValue(localDownloadQueue)
                 }
 
             } catch (e: CancellationException) {
@@ -579,13 +560,16 @@ object AppRepository {
                 downloadJobs.remove(key)
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed", e)
-                updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
+
+                removeFromDownloadQueue(key)
+                updateAppStatus(app.appId, versionId, isLatestVersion) {
+                    it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
+                }
                 downloadJobs.remove(key)
             }
         }
 
         downloadJobs[key] = newJob
-        newJob.start()
     }
 
     fun installHistoryVersion(app: AppInfo, historyVersion: HistoryVersion) {

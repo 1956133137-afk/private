@@ -115,7 +115,7 @@
                     android:drawablePadding="1dp"
                     android:gravity="start|center_vertical"
                     android:drawableStart="@drawable/bg_app_sss"
-                    android:hint="请输入订单号"
+                    android:hint="请输入应用名称"
                     android:paddingEnd="1dp"
                     android:singleLine="true"
                     android:textSize="10sp"

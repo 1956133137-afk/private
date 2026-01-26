@@ -216,7 +216,7 @@ object XcServiceManager {
                                 isInstallSuccessful = true
                                 break
                             } else if (i == 14) {
-                                LogUtil.e(TAG, "Installation failed after 15 seconds, installed version: $installedVersion, required: $newVersionCode")
+//                                LogUtil.e(TAG, "Installation failed after 15 seconds, installed version: $installedVersion, required: $newVersionCode")
                             }
                         }
                     } else {
