@@ -121,10 +121,16 @@ class HomeViewModel : ViewModel() {
 
     private fun filterApps(apps: List<AppInfo>?, keyword: String): List<AppInfo> {
         val list = apps ?: emptyList()
-        val kw = keyword.trim()
-        if (kw.isEmpty()) return list
+        
+        // 核心修改：过滤掉大小为空、"N/A" 或 "0B" 的软件
+        val filteredBySize = list.filter { app ->
+            app.size.isNotBlank() && app.size != "N/A" && app.size != "0B"
+        }
 
-        return list.filter { app ->
+        val kw = keyword.trim()
+        if (kw.isEmpty()) return filteredBySize
+
+        return filteredBySize.filter { app ->
             app.name.contains(kw, ignoreCase = true)
         }
     }

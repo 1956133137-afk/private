@@ -566,7 +566,7 @@ object AppRepository {
                     // 4. 更新下载队列（现在应为空）
                     localDownloadQueue = localDownloadQueue.filterNot { taskKey(it) == key }
 
-                    // 5. 一次性通知所有UI更新
+                    // 5. 一调次性通知所有UI更新
                     _allApps.postValue(localAllApps)
                     _recentInstalledApps.postValue(localRecentApps)
                     _downloadQueue.postValue(localDownloadQueue)
@@ -579,8 +579,6 @@ object AppRepository {
                 downloadJobs.remove(key)
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed", e)
-                // This catch block now only handles the state change. 
-                // The error message is posted by the function that actually failed (e.g., resolveDownloadApkPath).
                 updateAppStatus(app.appId, versionId, isLatestVersion) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                 downloadJobs.remove(key)
             }
@@ -607,7 +605,7 @@ object AppRepository {
             val response = apiService.getAppHistory(AppVersionHistoryRequest(appId = app.appId))
             if (response.code == 200 && response.data != null) {
                 response.data.map { versionItem ->
-                    val state = if (versionItem.versionCode.toLongOrNull() == installedVersionCode) {
+                    val state = if (versionItem.versionCode?.toLongOrNull() == installedVersionCode) {
                         InstallState.INSTALLED_LATEST
                     } else {
                         InstallState.NOT_INSTALLED
@@ -615,8 +613,8 @@ object AppRepository {
                     HistoryVersion(
                         versionId = versionItem.id,
                         versionName = versionItem.version,
-                        versionCode = versionItem.versionCode.toIntOrNull(),
-                        apkPath = "",
+                        versionCode = versionItem.versionCode?.toIntOrNull(),
+                        apkPath = versionItem.fileUrl ?: "",
                         installState = state
                     )
                 }
@@ -653,13 +651,21 @@ object AppRepository {
     fun checkAppUpdate() {
         coroutineScope.launch {
             try {
-                val appId = "32DQY9LH260HX43U"
+                val appId = SignConfig.APP_ID
                 val currentVersion = _appVersion.value?.removePrefix("V") ?: "1.0.0"
-                val latestVersionInfo = apiService.checkUpdate(
+                val response = apiService.checkUpdate(
                     CheckUpdateRequest(packageName = appId, currentVer = currentVersion)
                 )
-                if (latestVersionInfo != null && latestVersionInfo.versionName > currentVersion) {
-                    _checkUpdateResult.postValue(UpdateStatus.NEW_VERSION(latestVersionInfo.versionName))
+                if (response.code == 200 && response.data != null) {
+                    val list = response.data
+                    val latestVersionInfo = list.maxByOrNull { item: VersionResponse ->
+                        item.versionCode?.toIntOrNull() ?: 0
+                    }
+                    if (latestVersionInfo != null && (latestVersionInfo.version ?: "") > currentVersion) {
+                        _checkUpdateResult.postValue(UpdateStatus.NEW_VERSION(latestVersionInfo.version ?: ""))
+                    } else {
+                        _checkUpdateResult.postValue(UpdateStatus.LATEST)
+                    }
                 } else {
                     _checkUpdateResult.postValue(UpdateStatus.LATEST)
                 }

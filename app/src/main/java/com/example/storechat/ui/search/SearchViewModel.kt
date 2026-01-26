@@ -47,8 +47,16 @@ class SearchViewModel : ViewModel() {
 
     private fun filterApps(apps: List<AppInfo>?, keyword: String): List<AppInfo> {
         val appList = apps ?: emptyList()
+        
+        // 核心修改：过滤掉大小为空、"N/A" 或 "0B" 的软件
+        val filteredBySize = appList.filter { app ->
+            app.size.isNotBlank() && app.size != "N/A" && app.size != "0B"
+        }
+        
         val kw = keyword.trim()
-        return if (kw.isEmpty()) appList else appList.filter { it.name.contains(kw, ignoreCase = true) }
+        if (kw.isEmpty()) return filteredBySize
+        
+        return filteredBySize.filter { it.name.contains(kw, ignoreCase = true) }
     }
 
     fun search(keyword: String) {

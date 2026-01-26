@@ -1,6 +1,5 @@
 package com.example.storechat.data.api
 
-import com.example.storechat.model.VersionInfo
 import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -15,12 +14,12 @@ interface AppApiService {
     @POST("iotDeviceData/queryAppVersionList")
     suspend fun getAppHistory(
         @Body body: AppVersionHistoryRequest
-    ): AppVersionHistoryResponse
+    ): ApiWrapper<List<HistoryVersionItem>>
 
     @POST("iotDeviceData/queryAppVersionList")
     suspend fun checkUpdate(
         @Body body: CheckUpdateRequest
-    ): VersionInfo?
+    ): ApiWrapper<List<VersionResponse>>
 
     @POST("iotDeviceData/appVersionDownload")
     suspend fun getDownloadUrl(
@@ -80,16 +79,16 @@ data class AppVersionHistoryRequest(
     val appId: String
 )
 
-data class AppVersionHistoryResponse(
-    val code: Int,
-    val msg: String,
-    val data: List<HistoryVersionItem>?
-)
-
 data class HistoryVersionItem(
     val id: Long,
+    val appId: String,
     val version: String,
-    val versionCode: String
+    val versionCode: String,
+    val versionDesc: String?,
+    val fileUrl: String?,
+    val status: Int,
+    val createTime: String,
+    val updateTime: String
 )
 
 // --- Check Update --- //
@@ -97,5 +96,17 @@ data class CheckUpdateRequest(
     @SerializedName("appId")
     val packageName: String,
     @SerializedName("version")
-    val currentVer: String
+    val currentVer: String? = null
+)
+
+data class VersionResponse(
+    val id: Long,
+    val appId: String,
+    val version: String?,
+    val versionCode: String?,
+    val versionDesc: String?,
+    val fileUrl: String?,
+    val status: Int,
+    val createTime: String,
+    val updateTime: String
 )
