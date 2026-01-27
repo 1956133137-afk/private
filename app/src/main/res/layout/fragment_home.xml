@@ -175,7 +175,7 @@
                     android:id="@+id/tvNetworkError"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="网络不好，请稍后重试"
+                    android:text="网络不好，请切换网络后重试"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp"
                     android:visibility="@{viewModel.showNetworkError ? View.VISIBLE : View.GONE}"

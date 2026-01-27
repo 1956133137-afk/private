@@ -133,7 +133,11 @@ class HomeFragment : Fragment() {
         binding.ivDownloadManager?.setOnClickListener { openDownloadPage() }
         binding.layoutDownloadIcon?.setOnClickListener { openDownloadPage() }
 
-        binding.tvVersion?.setOnClickListener { viewModel.checkAppUpdate() }
+        // 暂时禁用版本更新功能
+        // binding.tvVersion?.setOnClickListener { 
+        //     Toast.makeText(requireContext(), "正在检查更新...", Toast.LENGTH_SHORT).show()
+        //     viewModel.checkAppUpdate()
+        // }
     }
 
     private fun performSearch() {
@@ -159,19 +163,21 @@ class HomeFragment : Fragment() {
             appListAdapter.submitList(apps)
         }
 
-        viewModel.checkUpdateResult.observe(viewLifecycleOwner) { status ->
-            when (status) {
-                is UpdateStatus.LATEST -> Toast.makeText(
-                    requireContext(),
-                    "当前已是最新版本",
-                    Toast.LENGTH_SHORT
-                ).show()
+        // 暂时禁用版本更新功能
+        // viewModel.checkUpdateResult.observe(viewLifecycleOwner) { status ->
+        //     if (status == null) return@observe
+        //     when (status) {
+        //         is UpdateStatus.LATEST -> {
+        //             Toast.makeText(requireContext(), "当前已是最新版本", Toast.LENGTH_SHORT).show()
+        //             viewModel.clearUpdateResult()
+        //         }
 
-                is UpdateStatus.NEW_VERSION -> showUpdateDialog(status)
-                null -> {}
-            }
-            viewModel.clearUpdateResult()
-        }
+        //         is UpdateStatus.NEW_VERSION -> {
+        //             showUpdateDialog(status)
+        //             // viewModel.clearUpdateResult() is called in showUpdateDialog's dismiss listener
+        //         }
+        //     }
+        // }
 
         viewModel.navigationEvent.observe(viewLifecycleOwner) { packageName ->
             if (packageName != null) {
@@ -232,10 +238,15 @@ class HomeFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle("发现新版本")
             .setMessage("当前版本：$currentVer\n最新版本：${status.latestVersion}")
-            .setNegativeButton("稍后") { dialog, _ -> dialog.dismiss() }
+            .setNegativeButton("稍后") { dialog, _ -> 
+                dialog.dismiss() 
+            }
             .setPositiveButton("去更新") { dialog, _ ->
                 dialog.dismiss()
                 viewModel.startSelfUpdate(status)
+            }
+            .setOnDismissListener { 
+                viewModel.clearUpdateResult() 
             }
             .show()
     }

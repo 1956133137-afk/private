@@ -105,7 +105,7 @@ object XcServiceManager {
     suspend fun downloadAndInstall(
         appId: String,
         versionId: Long,
-        newVersionCode: Int,
+        newVersionCode: Int, // 这个是服务器返回的版本号，可能不准
         url: String,
         onProgress: ((progress: Int, currentBytes: Long, totalBytes: Long) -> Unit)?
     ): String? = withContext(Dispatchers.IO) {
@@ -124,20 +124,32 @@ object XcServiceManager {
                 return@withContext null
             }
 
-            LogUtil.i(TAG, "Starting installation process for $realPackageName")
+            // 【核心修复】直接从下载的 APK 文件中读取真实版本号
+            // 如果 APK 本身是 57，我们就以 57 为目标，而不是死等服务器说的 58
+            val realVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                info.longVersionCode.toInt()
+            } else {
+                @Suppress("DEPRECATION")
+                info.versionCode
+            }
+
+            LogUtil.i(TAG, "Starting installation for $realPackageName. Server ver: $newVersionCode, APK real ver: $realVersionCode")
 
             var isInstallSuccessful = false
 
             // 方法 1: 使用首选静默安装服务
+            // 注意：这里传入 realVersionCode 而不是 newVersionCode
             LogUtil.i(TAG, "第一种方式: Preferred silent install (Type $boardType)")
-            isInstallSuccessful = trySilentInstall(pm, file, realPackageName, newVersionCode, boardType)
+            isInstallSuccessful = trySilentInstall(pm, file, realPackageName, realVersionCode, boardType)
 
-            // 方法 2: 如果首选失败，尝试另一种静默安装服务
+            // 方法 2: 如果首选失败...
             if (!isInstallSuccessful) {
                 val altType = if (boardType == 1) 2 else 1
                 LogUtil.i(TAG, "Method 1 failed, 第二种方式: Alternative silent install (Type $altType)")
-                isInstallSuccessful = trySilentInstall(pm, file, realPackageName, newVersionCode, altType)
+                isInstallSuccessful = trySilentInstall(pm, file, realPackageName, realVersionCode, altType)
             }
+
+            // ... (后续逻辑保持不变)
 
             // 方法 3: 如果静默安装都失败，尝试标准安装方法
             if (!isInstallSuccessful) {
@@ -193,7 +205,6 @@ object XcServiceManager {
             }
 
             // 2. 执行静默安装
-            // 2. 执行静默安装
             if (!isAppInstalled(pm, realPackageName)) {
                 LogUtil.i(TAG, "Executing silent install via Type $type")
                 when (type) {
@@ -201,19 +212,18 @@ object XcServiceManager {
                     2 -> mXHService?.silentInstallApk(file.absolutePath, false)
                 }
 
-                // 【修改点】将等待时间从 15秒 (0..14) 增加到 60秒 (0..59)
-                // RK3128 等老旧设备安装耗时较长，15秒往往不够
-                for (i in 0..59) {
+                // 将等待时间从 60秒 (0..59) 增加到 100秒 (0..99)
+                for (i in 0..99) {
                     delay(1000)
                     val installedVersion = getInstalledVersionCode(pm, realPackageName)
 
                     // 增加日志方便调试，看看到底读到了什么版本
                     if (i % 5 == 0) { // 每5秒打印一次
-                        LogUtil.d(TAG, "Checking install status ($i/60): current=$installedVersion, target=$newVersionCode")
+                        LogUtil.d(TAG, "Checking install status ($i/100): current=$installedVersion, target=$newVersionCode")
                     }
 
                     if (installedVersion >= newVersionCode) {
-                        LogUtil.i(TAG, "Silent install successful via Type $type")
+                        LogUtil.i(TAG, "Silent install 成功 via 方式 $type")
                         return true
                     }
                 }
@@ -225,17 +235,9 @@ object XcServiceManager {
         return false
     }
 
+
     /**
-     * 尝试使用标准安装方法（需要用户确认）
-     */
-    /**
-     * 尝试使用标准安装方法（彻底修复版）
-     */
-    /**
-     * 尝试使用标准安装方法（工控板兼容终极版）
-     */
-    /**
-     * 尝试使用标准安装方法（终极兼容版：复制到公共目录 + 绕过校验）
+     * 尝试使用标准安装方法（复制到公共目录 + 绕过校验）
      */
     private suspend fun tryStandardInstall(apkFile: File, packageName: String): Boolean = withContext(Dispatchers.IO) {
         // 定义一个临时文件在公共下载目录，这是系统安装器绝对有权限访问的地方
