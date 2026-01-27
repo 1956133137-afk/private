@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -43,6 +44,15 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
 
         // 全局监听服务器错误事件
         observeDownloadErrors()
+        observeEventMessages()
+    }
+
+    private fun observeEventMessages() {
+        AppRepository.eventMessage.observe(this) { message ->
+            if (message.isNotEmpty()) {
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun observeDownloadErrors() {

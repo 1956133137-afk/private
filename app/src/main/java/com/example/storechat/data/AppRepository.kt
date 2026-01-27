@@ -59,6 +59,8 @@ object AppRepository {
 
     private val _appVersion = MutableLiveData("V1.0.0")
     val appVersion: LiveData<String> = _appVersion
+    
+    private var currentVersionCode: Long = 1L
 
     private val _checkUpdateResult = MutableLiveData<UpdateStatus?>()
     val checkUpdateResult: LiveData<UpdateStatus?> = _checkUpdateResult
@@ -200,6 +202,11 @@ object AppRepository {
     fun initialize(context: Context) {
         AppPackageNameCache.init(context)
         XcServiceManager.init(context)
+        
+        // 初始化当前应用版本信息
+        val verName = AppUtils.getAppVersionName(context)
+        currentVersionCode = AppUtils.getAppVersionCode(context)
+        _appVersion.postValue("V$verName")
 
         val db = AppDatabase.getDatabase(context)
         downloadDao = db.downloadDao()
@@ -560,7 +567,7 @@ object AppRepository {
                 downloadJobs.remove(key)
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed", e)
-
+                eventMessage.postValue("安装失败")
                 removeFromDownloadQueue(key)
                 updateAppStatus(app.appId, versionId, isLatestVersion) {
                     it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
@@ -599,7 +606,8 @@ object AppRepository {
                         versionName = versionItem.version,
                         versionCode = versionItem.versionCode?.toIntOrNull(),
                         apkPath = versionItem.fileUrl ?: "",
-                        installState = state
+                        installState = state,
+                        appName = app.name // Pass the app name here
                     )
                 }
             } else {
@@ -636,17 +644,25 @@ object AppRepository {
         coroutineScope.launch {
             try {
                 val appId = SignConfig.APP_ID
-                val currentVersion = _appVersion.value?.removePrefix("V") ?: "1.0.0"
+                // 使用版本号进行比较，而不是字符串版本名
                 val response = apiService.checkUpdate(
-                    CheckUpdateRequest(packageName = appId, currentVer = currentVersion)
+                    CheckUpdateRequest(packageName = appId)
                 )
                 if (response.code == 200 && response.data != null) {
                     val list = response.data
                     val latestVersionInfo = list.maxByOrNull { item: VersionResponse ->
-                        item.versionCode?.toIntOrNull() ?: 0
+                        item.versionCode?.toLongOrNull() ?: 0L
                     }
-                    if (latestVersionInfo != null && (latestVersionInfo.version ?: "") > currentVersion) {
-                        _checkUpdateResult.postValue(UpdateStatus.NEW_VERSION(latestVersionInfo.version ?: ""))
+                    
+                    val latestVC = latestVersionInfo?.versionCode?.toLongOrNull() ?: 0L
+                    
+                    if (latestVersionInfo != null && latestVC > currentVersionCode) {
+                        _checkUpdateResult.postValue(UpdateStatus.NEW_VERSION(
+                            latestVersion = latestVersionInfo.version ?: "未知版本",
+                            latestVersionCode = latestVC,
+                            downloadUrl = latestVersionInfo.fileUrl,
+                            description = latestVersionInfo.versionDesc
+                        ))
                     } else {
                         _checkUpdateResult.postValue(UpdateStatus.LATEST)
                     }
@@ -654,7 +670,35 @@ object AppRepository {
                     _checkUpdateResult.postValue(UpdateStatus.LATEST)
                 }
             } catch (e: Exception) {
+                LogUtil.e(TAG, "Check update failed", e)
                 _checkUpdateResult.postValue(UpdateStatus.LATEST)
+            }
+        }
+    }
+
+    fun startSelfUpdate(status: UpdateStatus.NEW_VERSION) {
+        val url = status.downloadUrl
+        if (url.isNullOrBlank()) {
+            eventMessage.postValue("更新地址无效")
+            return
+        }
+        
+        coroutineScope.launch {
+            try {
+                eventMessage.postValue("正在后台下载更新...")
+                val installedPackageName = XcServiceManager.downloadAndInstall(
+                    appId = SignConfig.APP_ID,
+                    versionId = System.currentTimeMillis(), // 临时 ID
+                    newVersionCode = status.latestVersionCode.toInt(),
+                    url = url,
+                    onProgress = null
+                )
+                if (installedPackageName == null) {
+                    eventMessage.postValue("更新失败")
+                }
+            } catch (e: Exception) {
+                LogUtil.e(TAG, "Self update failed", e)
+                eventMessage.postValue("更新失败: ${e.message}")
             }
         }
     }

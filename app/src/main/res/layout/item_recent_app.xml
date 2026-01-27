@@ -22,23 +22,27 @@
             android:src="@drawable/bg_app_apk"
             tools:ignore="ContentDescription" />
 
-        <!-- This view is only for compatibility with the landscape layout -->
         <TextView
             android:id="@+id/tvAppName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:visibility="gone"
-            tools:text="App Name" />
-
-        <TextView
-            android:id="@+id/tvVersion"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="@{app.versionName}"
+            android:text="@{app.name}"
             android:textColor="@color/text_primary"
-            android:textSize="12sp"
-            tools:text="v.1.01" />
+            android:textSize="14sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="应用名称" />
+
+<!--        <TextView-->
+<!--            android:id="@+id/tvVersion"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_marginTop="2dp"-->
+<!--            android:text="@{app.versionName}"-->
+<!--            android:textColor="#999999"-->
+<!--            android:textSize="12sp"-->
+<!--            tools:text="v.1.01" />-->
 
         <Button
             android:id="@+id/btnInstall"

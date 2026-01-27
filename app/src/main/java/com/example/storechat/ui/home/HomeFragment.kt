@@ -167,7 +167,7 @@ class HomeFragment : Fragment() {
                     Toast.LENGTH_SHORT
                 ).show()
 
-                is UpdateStatus.NEW_VERSION -> showUpdateDialog(status.latestVersion)
+                is UpdateStatus.NEW_VERSION -> showUpdateDialog(status)
                 null -> {}
             }
             viewModel.clearUpdateResult()
@@ -226,16 +226,16 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun showUpdateDialog(latestVer: String) {
+    private fun showUpdateDialog(status: UpdateStatus.NEW_VERSION) {
         val currentVer = viewModel.appVersion.value ?: "V1.0.0"
 
         AlertDialog.Builder(requireContext())
             .setTitle("发现新版本")
-            .setMessage("当前版本：$currentVer\n最新版本：$latestVer")
+            .setMessage("当前版本：$currentVer\n最新版本：${status.latestVersion}")
             .setNegativeButton("稍后") { dialog, _ -> dialog.dismiss() }
             .setPositiveButton("去更新") { dialog, _ ->
                 dialog.dismiss()
-                Toast.makeText(requireContext(), "这里接入应用商店自更新逻辑", Toast.LENGTH_SHORT).show()
+                viewModel.startSelfUpdate(status)
             }
             .show()
     }

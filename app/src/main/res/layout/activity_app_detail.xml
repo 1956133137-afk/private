@@ -149,7 +149,7 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_marginStart="16dp"
-            android.layout_marginEnd="16dp"
+            android:layout_marginEnd="16dp"
             android:layout_marginBottom="24dp"
             android:background="@drawable/bg_btn_progress"
             android:visibility="@{viewModel.appInfo.showProgress &amp;&amp; !viewModel.isHistoryTabSelected ? View.VISIBLE : View.GONE}"

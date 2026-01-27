@@ -1,6 +1,7 @@
 package com.example.storechat.util
 
 import android.content.Context
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 
@@ -25,11 +26,33 @@ object AppUtils {
     }
 
     /**
-     * 检查应用是否已安装
+     * 获取当前应用的版本名称
      */
-//    fun isAppInstalled(context: Context, packageName: String): Boolean {
-//        return getInstalledVersionCode(context, packageName) != -1L
-//    }
+    fun getAppVersionName(context: Context): String {
+        return try {
+            val pInfo: PackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            pInfo.versionName ?: "1.0.0"
+        } catch (e: PackageManager.NameNotFoundException) {
+            "1.0.0"
+        }
+    }
+
+    /**
+     * 获取当前应用的版本号
+     */
+    fun getAppVersionCode(context: Context): Long {
+        return try {
+            val pInfo: PackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                pInfo.versionCode.toLong()
+            }
+        } catch (e: PackageManager.NameNotFoundException) {
+            1L
+        }
+    }
 
     /**
      * 打开已安装的应用

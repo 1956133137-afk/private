@@ -174,6 +174,10 @@ class HomeViewModel : ViewModel() {
         AppRepository.checkAppUpdate()
     }
 
+    fun startSelfUpdate(status: UpdateStatus.NEW_VERSION) {
+        AppRepository.startSelfUpdate(status)
+    }
+
     fun clearUpdateResult() {
         AppRepository.clearUpdateResult()
     }

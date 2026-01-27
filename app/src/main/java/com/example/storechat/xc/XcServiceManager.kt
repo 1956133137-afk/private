@@ -129,19 +129,19 @@ object XcServiceManager {
             var isInstallSuccessful = false
 
             // 方法 1: 使用首选静默安装服务
-            LogUtil.i(TAG, "Trying Method 1: Preferred silent install (Type $boardType)")
+            LogUtil.i(TAG, "第一种方式: Preferred silent install (Type $boardType)")
             isInstallSuccessful = trySilentInstall(pm, file, realPackageName, newVersionCode, boardType)
 
             // 方法 2: 如果首选失败，尝试另一种静默安装服务
             if (!isInstallSuccessful) {
                 val altType = if (boardType == 1) 2 else 1
-                LogUtil.i(TAG, "Method 1 failed, trying Method 2: Alternative silent install (Type $altType)")
+                LogUtil.i(TAG, "Method 1 failed, 第二种方式: Alternative silent install (Type $altType)")
                 isInstallSuccessful = trySilentInstall(pm, file, realPackageName, newVersionCode, altType)
             }
 
             // 方法 3: 如果静默安装都失败，尝试标准安装方法
             if (!isInstallSuccessful) {
-                LogUtil.i(TAG, "Silent installation failed, trying Method 3: Standard installation")
+                LogUtil.i(TAG, "Silent installation failed, 第三种方式: Standard installation")
                 isInstallSuccessful = tryStandardInstall(file, realPackageName)
             }
 
@@ -201,7 +201,7 @@ object XcServiceManager {
                 }
 
                 // 等待安装完成 (最多15秒)
-                for (i in 0..14) {
+                for (i in 0..12) {
                     delay(1000)
                     val installedVersion = getInstalledVersionCode(pm, realPackageName)
                     if (installedVersion >= newVersionCode) {
@@ -220,27 +220,72 @@ object XcServiceManager {
     /**
      * 尝试使用标准安装方法（需要用户确认）
      */
-    private suspend fun tryStandardInstall(apkFile: File, packageName: String): Boolean = withContext(Dispatchers.Main) {
+    /**
+     * 尝试使用标准安装方法（彻底修复版）
+     */
+    /**
+     * 尝试使用标准安装方法（工控板兼容终极版）
+     */
+    /**
+     * 尝试使用标准安装方法（终极兼容版：复制到公共目录 + 绕过校验）
+     */
+    private suspend fun tryStandardInstall(apkFile: File, packageName: String): Boolean = withContext(Dispatchers.IO) {
+        // 定义一个临时文件在公共下载目录，这是系统安装器绝对有权限访问的地方
+        val publicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!publicDir.exists()) publicDir.mkdirs()
+
+        // 为了防止文件名冲突导致解析错误，使用固定名字或时间戳
+        val targetFile = File(publicDir, "update_temp_${System.currentTimeMillis()}.apk")
+
         try {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    val uri = FileProvider.getUriForFile(
-                        appContext,
-                        "${appContext.packageName}.fileprovider",
-                        apkFile
-                    )
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                } else {
-                    setDataAndType(Uri.fromFile(apkFile), "application/vnd.android.package-archive")
+            LogUtil.i(TAG, "Copying APK to public directory: ${targetFile.absolutePath}")
+
+            // 1. 将文件复制到公共目录 (解决私有目录权限问题)
+            apkFile.copyTo(targetFile, overwrite = true)
+
+            // 2. 暴力赋予 777 权限 (解决 Linux 文件权限问题)
+            try {
+                val p = Runtime.getRuntime().exec("chmod 777 ${targetFile.absolutePath}")
+                p.waitFor()
+            } catch (e: Exception) {
+                LogUtil.w(TAG, "Chmod failed: ${e.message}")
+            }
+
+            // 3. 禁用 Android 7.0+ 的 FileUriExposed 检查 (强制允许 file:// 协议)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                try {
+                    val builder = android.os.StrictMode.VmPolicy.Builder()
+                    android.os.StrictMode.setVmPolicy(builder.build())
+                } catch (e: Exception) {
+                    LogUtil.e(TAG, "Disable StrictMode failed: ${e.message}")
                 }
             }
 
-            appContext.startActivity(intent)
-            LogUtil.i(TAG, "Started standard installation for $packageName")
+            // 4. 启动安装
+            withContext(Dispatchers.Main) {
+                val intent = Intent(Intent.ACTION_VIEW)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                // 直接使用文件路径 URI
+                val uri = Uri.fromFile(targetFile)
+                LogUtil.i(TAG, "Starting installation with public file: $uri")
+
+                intent.setDataAndType(uri, "application/vnd.android.package-archive")
+                appContext.startActivity(intent)
+            }
             true
         } catch (e: Exception) {
-            LogUtil.e(TAG, "Failed to start standard installation: ${e.message}")
+            LogUtil.e(TAG, "Failed to copy/install APK: ${e.message}")
+            e.printStackTrace()
+            // 如果复制失败，尝试直接用源文件兜底（虽然很大概率还是不行）
+            withContext(Dispatchers.Main) {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    intent.setDataAndType(Uri.fromFile(apkFile), "application/vnd.android.package-archive")
+                    appContext.startActivity(intent)
+                } catch (ex: Exception) {}
+            }
             false
         }
     }

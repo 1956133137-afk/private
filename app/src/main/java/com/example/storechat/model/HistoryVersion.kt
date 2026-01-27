@@ -9,13 +9,15 @@ import java.io.Serializable
  * @param versionName The display name of the version (e.g., "1.0.2").
  * @param apkPath Placeholder for the APK file path.
  * @param installState The installation state of this specific version on the device.
+ * @param appName The name of the application.
  */
 data class HistoryVersion(
     val versionId: Long,
     val versionName: String,
     val versionCode: Int?,
     val apkPath: String,
-    var installState: InstallState = InstallState.NOT_INSTALLED
+    var installState: InstallState = InstallState.NOT_INSTALLED,
+    val appName: String = ""
 ) : Serializable {
 
     val buttonText: String
@@ -24,6 +26,6 @@ data class HistoryVersion(
             else -> "安装"
         }
 
-    val isButtonEnabled: Boolean
+    val buttonEnabled: Boolean
         get() = true // Always clickable in history list
 }
