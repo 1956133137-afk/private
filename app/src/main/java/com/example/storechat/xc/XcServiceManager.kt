@@ -193,6 +193,7 @@ object XcServiceManager {
             }
 
             // 2. 执行静默安装
+            // 2. 执行静默安装
             if (!isAppInstalled(pm, realPackageName)) {
                 LogUtil.i(TAG, "Executing silent install via Type $type")
                 when (type) {
@@ -200,10 +201,17 @@ object XcServiceManager {
                     2 -> mXHService?.silentInstallApk(file.absolutePath, false)
                 }
 
-                // 等待安装完成 (最多15秒)
-                for (i in 0..12) {
+                // 【修改点】将等待时间从 15秒 (0..14) 增加到 60秒 (0..59)
+                // RK3128 等老旧设备安装耗时较长，15秒往往不够
+                for (i in 0..59) {
                     delay(1000)
                     val installedVersion = getInstalledVersionCode(pm, realPackageName)
+
+                    // 增加日志方便调试，看看到底读到了什么版本
+                    if (i % 5 == 0) { // 每5秒打印一次
+                        LogUtil.d(TAG, "Checking install status ($i/60): current=$installedVersion, target=$newVersionCode")
+                    }
+
                     if (installedVersion >= newVersionCode) {
                         LogUtil.i(TAG, "Silent install successful via Type $type")
                         return true
