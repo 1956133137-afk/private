@@ -72,7 +72,7 @@ class AppDetailFragment : Fragment() {
         AppRepository.downloadErrorEvent.observe(viewLifecycleOwner) { errorMessage ->
             if (errorMessage != null && errorMessage.isNotEmpty()) {
                 val dialog = AlertDialog.Builder(requireContext())
-                    .setTitle("下载提示")
+                    .setTitle("安装提示")
                     .setMessage(errorMessage)
                     .setPositiveButton("确定") { d, _ ->
                         d.dismiss()

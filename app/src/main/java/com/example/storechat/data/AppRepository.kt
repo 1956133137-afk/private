@@ -1,6 +1,8 @@
 package com.example.storechat.data
 
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.example.storechat.util.LogUtil
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
@@ -222,7 +224,7 @@ object AppRepository {
                 if (status == DownloadStatus.DOWNLOADING) {
                     status = DownloadStatus.PAUSED
                 }
-                if (status == DownloadStatus.PAUSED && entity.savePath.isNotEmpty()) {
+                if (status == DownloadStatus.PAUSED) {
                     if (!File(entity.savePath).exists()) {
                         status = DownloadStatus.NONE
                     }
@@ -272,11 +274,11 @@ object AppRepository {
                 if (runningTask != null) return@map runningTask
 
                 var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
-                val isJobRunning = key != null && downloadJobs.containsKey(key)
+                val isJobRunning = key?.let { downloadJobs.containsKey(it) } ?: false
                 if (status == DownloadStatus.DOWNLOADING && !isJobRunning) {
                     status = DownloadStatus.PAUSED
                 }
-                if (status == DownloadStatus.PAUSED && entity.savePath.isNotEmpty()) {
+                if (status == DownloadStatus.PAUSED) {
                     if (!File(entity.savePath).exists()) {
                         status = DownloadStatus.NONE
                     }
@@ -467,6 +469,10 @@ object AppRepository {
         }
     }
 
+
+//    后续修复版本更新
+
+    @RequiresApi(Build.VERSION_CODES.N)
     fun toggleDownload(app: AppInfo) {
         val versionId = app.versionId
         if (versionId == null) {
@@ -503,16 +509,25 @@ object AppRepository {
                     )
                 }
 
+                // 【优化点 1】定义变量记录上一次的进度
+                var lastReportedProgress = -1
+
                 val installedPackageName = XcServiceManager.downloadAndInstall(
                     appId = app.appId,
                     versionId = versionId,
                     newVersionCode = app.versionCode ?: -1,
                     url = realApkPath,
                     onProgress = { percent, currentBytes, totalBytes ->
-                        val currentStr = formatSize(currentBytes)
-                        val totalStr = formatSize(totalBytes)
-                        updateAppStatus(app.appId, versionId, isLatestVersion) {
-                            it.copy(progress = percent, currentSizeStr = currentStr, totalSizeStr = totalStr)
+                        // 【优化点 2】只有进度百分比发生变化时才更新 UI
+                        if (percent != lastReportedProgress) {
+                            lastReportedProgress = percent
+
+                            val currentStr = formatSize(currentBytes)
+                            val totalStr = formatSize(totalBytes)
+
+                            updateAppStatus(app.appId, versionId, isLatestVersion) {
+                                it.copy(progress = percent, currentSizeStr = currentStr, totalSizeStr = totalStr)
+                            }
                         }
                     }
                 )
@@ -555,7 +570,7 @@ object AppRepository {
                         localRecentApps = localRecentApps.filterNot { recent -> recent.packageName == it.packageName }
                         localRecentApps = listOf(it) + localRecentApps
                     }
-                    
+
                     _allApps.postValue(localAllApps)
                     _recentInstalledApps.postValue(localRecentApps)
                 }
@@ -567,7 +582,12 @@ object AppRepository {
                 downloadJobs.remove(key)
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed", e)
-                eventMessage.postValue("安装失败")
+
+                // 【核心修复】将错误信息发送给 UI 层，否则 MainActivity 无法弹出对话框
+                // 提取异常信息，如果是 "安装失败" 这种已知错误，直接显示；否则显示通用提示
+                val msg = e.message ?: "未知错误"
+                downloadErrorEvent.postValue("下载或安装失败: $msg")
+
                 removeFromDownloadQueue(key)
                 updateAppStatus(app.appId, versionId, isLatestVersion) {
                     it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
