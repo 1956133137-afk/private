@@ -23,14 +23,14 @@
             android:contentDescription="@null" />
 
         <TextView
-            android:id="@+id/tvAppName"
+            android:id="@+id/tvVersionName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="@{version.appName}"
+            android:text='@{"v." + version.versionName}'
             android:textSize="12sp"
             android:textColor="@color/text_secondary"
-            tools:text="应用名称" />
+            tools:text="v.1.01" />
 
         <Button
             android:id="@+id/btnInstall"
