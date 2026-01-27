@@ -66,7 +66,7 @@ object XcServiceManager {
                     "rk3576_u", "QUAD-CORE A133 b7" -> 2
                     else -> 1
                 }
-                
+
                 isInitialized = true
                 LogUtil.i(TAG, "Service manager initialized. Preferred boardType: $boardType")
             } catch (e: Exception) {
@@ -158,7 +158,7 @@ object XcServiceManager {
             }
 
             if (!isInstallSuccessful) return@withContext null
-            
+
             LogUtil.i(TAG, "Installation flow completed for: $realPackageName")
             return@withContext realPackageName
 
@@ -180,7 +180,7 @@ object XcServiceManager {
         type: Int
     ): Boolean {
         if (!isInitialized) return false
-        
+
         try {
             // 检查对应服务是否可用
             if (type == 1 && mXCService == null) return false
@@ -193,7 +193,7 @@ object XcServiceManager {
                     1 -> mXCService?.silentUnInstallApk(realPackageName)
                     2 -> mXHService?.selfStart(realPackageName) // 保持原有逻辑
                 }
-                
+
                 // 等待卸载完成 (最多5秒)
                 for (i in 0..4) {
                     delay(1000)
@@ -332,10 +332,10 @@ object XcServiceManager {
 
             val isResumable = response.code == 206
             if (!response.isSuccessful && !isResumable) {
-                 if (file.exists()) file.delete()
+                if (file.exists()) file.delete()
                 return null
             }
-            
+
             if (file.exists() && downloadedBytes > 0 && !isResumable) {
                 file.delete()
                 downloadedBytes = 0

@@ -238,15 +238,15 @@ class HomeFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle("发现新版本")
             .setMessage("当前版本：$currentVer\n最新版本：${status.latestVersion}")
-            .setNegativeButton("稍后") { dialog, _ -> 
-                dialog.dismiss() 
+            .setNegativeButton("稍后") { dialog, _ ->
+                dialog.dismiss()
             }
             .setPositiveButton("去更新") { dialog, _ ->
                 dialog.dismiss()
                 viewModel.startSelfUpdate(status)
             }
-            .setOnDismissListener { 
-                viewModel.clearUpdateResult() 
+            .setOnDismissListener {
+                viewModel.clearUpdateResult()
             }
             .show()
     }

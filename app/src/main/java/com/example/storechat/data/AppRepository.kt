@@ -61,7 +61,7 @@ object AppRepository {
 
     private val _appVersion = MutableLiveData("V1.0.0")
     val appVersion: LiveData<String> = _appVersion
-    
+
     private var currentVersionCode: Long = 1L
 
     private val _checkUpdateResult = MutableLiveData<UpdateStatus?>()
@@ -204,7 +204,7 @@ object AppRepository {
     fun initialize(context: Context) {
         AppPackageNameCache.init(context)
         XcServiceManager.init(context)
-        
+
         // 初始化当前应用版本信息
         val verName = AppUtils.getAppVersionName(context)
         currentVersionCode = AppUtils.getAppVersionCode(context)
@@ -673,9 +673,9 @@ object AppRepository {
                     val latestVersionInfo = list.maxByOrNull { item: VersionResponse ->
                         item.versionCode?.toLongOrNull() ?: 0L
                     }
-                    
+
                     val latestVC = latestVersionInfo?.versionCode?.toLongOrNull() ?: 0L
-                    
+
                     if (latestVersionInfo != null && latestVC > currentVersionCode) {
                         _checkUpdateResult.postValue(UpdateStatus.NEW_VERSION(
                             latestVersion = latestVersionInfo.version ?: "未知版本",
@@ -702,7 +702,7 @@ object AppRepository {
             eventMessage.postValue("更新地址无效")
             return
         }
-        
+
         coroutineScope.launch {
             try {
                 eventMessage.postValue("正在后台下载更新...")
