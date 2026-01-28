@@ -63,7 +63,7 @@ object XcServiceManager {
 
                 // 根据设备型号设置首选主板类型
                 boardType = when (Build.MODEL.trim()) {
-                    "rk3576_u", "QUAD-CORE A133 b7" -> 2
+                    "rk3576_u","QUAD-CORE A133 c3" -> 2
                     else -> 1
                 }
 
@@ -213,7 +213,7 @@ object XcServiceManager {
                 }
 
                 // 将等待时间从 60秒 (0..59) 增加到 100秒 (0..99)
-                for (i in 0..99) {
+                for (i in 0..24) {
                     delay(1000)
                     val installedVersion = getInstalledVersionCode(pm, realPackageName)
 

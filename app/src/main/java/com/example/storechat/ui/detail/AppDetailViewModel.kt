@@ -43,6 +43,9 @@ class AppDetailViewModel : ViewModel() {
     //  缓存：最新版本基础信息（来自 allApps）
     private var baseFromRepo: AppInfo? = null
 
+    // 【核心修复】新增：用于锁定当前应用的唯一ID
+    private var trackedAppId: String? = null
+
     init {
         //  监听下载队列变化：用于刷新“历史版本”的按钮状态（下载中/暂停/进度）
         _appInfo.addSource(AppRepository.downloadQueue) {
@@ -53,11 +56,29 @@ class AppDetailViewModel : ViewModel() {
     fun loadApp(packageName: String) {
         appInfoSource?.let { _appInfo.removeSource(it) }
 
+        // 【核心修复】修改监听逻辑：优先使用 ID 匹配，防止包名变更导致丢失
         val newSource = AppRepository.allApps.map { apps ->
-            apps.find { it.packageName == packageName }
+            // 策略1：如果已经锁定了 appId，直接通过 ID 查找（最稳健，不受包名变化影响）
+            if (trackedAppId != null) {
+                val match = apps.find { it.appId == trackedAppId }
+                if (match != null) return@map match
+            }
+
+            // 策略2：如果还没锁定 ID，通过传入的包名查找
+            val match = apps.find { it.packageName == packageName }
+            if (match != null) {
+                // 找到后立即锁定 ID，确保后续安装成功包名变更时能继续追踪
+                trackedAppId = match.appId
+            }
+            match
         }
 
         _appInfo.addSource(newSource) { appFromRepo ->
+
+            // 如果应用在仓库中因某种原因消失（极为罕见），保持最后状态不更新为 null
+            if (appFromRepo == null && baseFromRepo != null) {
+                return@addSource
+            }
             baseFromRepo = appFromRepo
             // 每次仓库数据更新（例如安装成功后），重新计算当前显示详情和列表状态
             recomputeAppInfo()
@@ -72,6 +93,8 @@ class AppDetailViewModel : ViewModel() {
      */
     fun setAppInfo(app: AppInfo) {
         historyOverride = null
+        // 【核心修复】直接锁定 appId
+        trackedAppId = app.appId
         loadApp(app.packageName)
         loadAppSize(app)
     }
