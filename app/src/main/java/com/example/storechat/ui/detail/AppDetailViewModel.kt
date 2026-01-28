@@ -11,6 +11,7 @@ import com.example.storechat.data.AppRepository
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.DownloadStatus
 import com.example.storechat.model.HistoryVersion
+import com.example.storechat.model.InstallState
 import kotlinx.coroutines.launch
 
 class AppDetailViewModel : ViewModel() {
@@ -32,6 +33,9 @@ class AppDetailViewModel : ViewModel() {
     val isHistoryTabSelected = MutableLiveData<Boolean>(false)
 
     private val historyVersionCache = mutableMapOf<String, List<HistoryVersion>>()
+
+    // 保存网络请求回来的原始历史版本列表，用于后续状态刷新
+    private var rawHistoryVersions: List<HistoryVersion>? = null
 
     //  历史版本详情：保存“你点击的那一条版本信息”（版本号/版本ID/安装状态）
     private var historyOverride: AppInfo? = null
@@ -55,7 +59,9 @@ class AppDetailViewModel : ViewModel() {
 
         _appInfo.addSource(newSource) { appFromRepo ->
             baseFromRepo = appFromRepo
+            // 每次仓库数据更新（例如安装成功后），重新计算当前显示详情和列表状态
             recomputeAppInfo()
+            updateHistoryVersionsState()
         }
 
         appInfoSource = newSource
@@ -81,8 +87,7 @@ class AppDetailViewModel : ViewModel() {
      */
     fun setHistoryAppInfo(app: AppInfo) {
         historyOverride = app
-        // 【关键修复】如果当前已经有基础数据且包名一致，不要重新 loadApp，
-        // 而是直接重新计算并应用 historyOverride。这样可以避免异步加载导致的数据闪烁或重置。
+        // 如果当前已经有基础数据且包名一致，直接重新计算，避免闪烁
         if (baseFromRepo != null && baseFromRepo?.packageName == app.packageName) {
             recomputeAppInfo()
         } else {
@@ -96,47 +101,63 @@ class AppDetailViewModel : ViewModel() {
         val historyAppInfo = currentApp.copy(
             versionId = historyVersion.versionId,
             versionName = historyVersion.versionName,
+            versionCode = historyVersion.versionCode, // 【修复】必须传递历史版本的 versionCode
             // 如果历史版本有独立的描述，可以在这里设置；否则暂时用 apkPath 或保持原描述
             description = historyVersion.apkPath,
             installState = historyVersion.installState,
-            downloadStatus = DownloadStatus.NONE,progress = 0
+            downloadStatus = DownloadStatus.NONE,
+            progress = 0
         )
 
         // 设置覆盖信息
         setHistoryAppInfo(historyAppInfo)
 
         // 切换到 Tab 0 (详情页)
-        _switchToTab.value = 0 // Request to switch to the first tab
+        _switchToTab.value = 0
     }
 
     private fun recomputeAppInfo() {
         val base = baseFromRepo ?: return
         val override = historyOverride
 
-        // 最新版本详情
+        // 1. 最新版本详情
         if (override == null) {
             _appInfo.value = base.copy(isHistory = false)
             return
         }
 
-        // 2. 如果有历史版本覆盖，显示历史版本详情 (isHistory = true)
-        // 尝试在下载队列中找到这个历史版本（通过 versionId 匹配）
+        // 2. 历史版本详情
+
+        // 尝试在下载队列中找到这个历史版本
         val queueItemForThisVersion = AppRepository.downloadQueue.value
             ?.firstOrNull { it.packageName == base.packageName && it.versionId == override.versionId }
 
-        // 状态优先级：队列中的状态 > 传入的历史记录状态
-        val statusSource = queueItemForThisVersion ?: override
+        // 【核心修复】动态计算历史版本的安装状态
+        // 使用 base.installedVersionCode (来自 Repository 的最新数据) 与当前历史版本的 versionCode 进行比对。
+        val dynamicInstallState = if (base.installedVersionCode != 0L && override.versionCode != null && base.installedVersionCode == override.versionCode.toLong()) {
+            InstallState.INSTALLED_LATEST // 如果版本号一致，视为"已安装"（显示"打开"）
+        } else {
+            InstallState.NOT_INSTALLED // 否则一律视为"未安装"（显示"安装"）
+        }
+
+        // 状态优先级：队列中的状态 > 动态计算的安装状态 > 覆盖记录的原始状态(fallback)
+        val finalInstallState = queueItemForThisVersion?.installState ?: dynamicInstallState
+        val finalDownloadStatus = queueItemForThisVersion?.downloadStatus ?: DownloadStatus.NONE
+        val finalProgress = queueItemForThisVersion?.progress ?: 0
 
         _appInfo.value = base.copy(
             // 核心信息使用 override (历史版本)
             versionId = override.versionId,
             versionName = override.versionName,
+            versionCode = override.versionCode, // 确保版本号也同步过去
             description = override.description,
-            installState = override.installState,
+
+            // 使用动态计算的状态
+            installState = finalInstallState,
 
             // 下载状态使用 statusSource (可能是下载队列中的实时状态)
-            downloadStatus = statusSource.downloadStatus,
-            progress = statusSource.progress,
+            downloadStatus = finalDownloadStatus,
+            progress = finalProgress,
 
             // 标记为历史查看模式
             isHistory = true
@@ -145,20 +166,43 @@ class AppDetailViewModel : ViewModel() {
 
     fun loadHistoryFor(context: Context, app: AppInfo) {
         if (historyVersionCache.containsKey(app.appId)) {
-            _historyVersions.value = historyVersionCache[app.appId]
+            rawHistoryVersions = historyVersionCache[app.appId]
+            updateHistoryVersionsState() // 使用缓存也需要刷新状态
             return
         }
 
         viewModelScope.launch {
             _isLoading.postValue(true)
             val history = AppRepository.loadHistoryVersions(context, app)
-            _historyVersions.postValue(history)
-            _isLoading.postValue(false)
+            rawHistoryVersions = history
             historyVersionCache[app.appId] = history
+
+            updateHistoryVersionsState() // 加载完成后刷新状态
+
+            _isLoading.postValue(false)
         }
+    }
+
+    // 根据当前的 installedVersionCode 刷新历史列表的状态
+    private fun updateHistoryVersionsState() {
+        val raw = rawHistoryVersions ?: return
+        val currentInstalledCode = baseFromRepo?.installedVersionCode ?: 0L
+
+        val updatedList = raw.map { historyVer ->
+            val code = historyVer.versionCode?.toLong() ?: -1L
+            // 只有当版本号完全一致时，才认为是“已安装”
+            val newState = if (code != -1L && code == currentInstalledCode) {
+                InstallState.INSTALLED_LATEST
+            } else {
+                InstallState.NOT_INSTALLED
+            }
+            historyVer.copy(installState = newState)
+        }
+        _historyVersions.postValue(updatedList)
     }
 
     fun clearHistoryCache() {
         historyVersionCache.clear()
+        rawHistoryVersions = null
     }
 }

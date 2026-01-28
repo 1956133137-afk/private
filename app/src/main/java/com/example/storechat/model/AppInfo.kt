@@ -10,13 +10,13 @@ enum class InstallState {
 
 data class AppInfo(
     val name: String,
-    val appId: String, // from server
-    val versionId: Long?, // from server, the ID of the latest version
-    val versionCode: Int?, // from server
-    val category: AppCategory, // from server
-    val createTime: String?, // from server
-    val updateTime: String?, // from server
-    val remark: String?, // from server
+    val appId: String,
+    val versionId: Long?,
+    val versionCode: Int?,
+    val category: AppCategory,
+    val createTime: String?,
+    val updateTime: String?,
+    val remark: String?,
     val description: String?,
     val size: String,
     val downloadCount: Int,
@@ -30,9 +30,12 @@ data class AppInfo(
     var isInstalled: Boolean = false,
     val isHistory: Boolean = false,
 
-    // --- 新增字段：用于实时显示下载大小，默认值为空字符串 ---
     val currentSizeStr: String = "",
-    val totalSizeStr: String = ""
+    val totalSizeStr: String = "",
+
+    // 【核心修复】新增：保存设备当前实际安装的版本号
+    // 用于在详情页与历史版本的 versionCode 进行比对，判断该历史版本是否就是当前已安装版本
+    val installedVersionCode: Long = 0
 ) : Serializable {
 
     init {
@@ -48,13 +51,12 @@ data class AppInfo(
     val buttonText: String
         get() = when (downloadStatus) {
             DownloadStatus.DOWNLOADING -> "暂停"
-            // 【修改】统一改为 "继续"，原为 "重试"
             DownloadStatus.PAUSED -> "继续"
             DownloadStatus.VERIFYING -> "验证中"
             DownloadStatus.INSTALLING -> "安装中"
             DownloadStatus.NONE -> when (installState) {
                 InstallState.NOT_INSTALLED -> "安装"
-                InstallState.INSTALLED_OLD -> "升级"
+                InstallState.INSTALLED_OLD -> "升级" // 或者显示“更新”
                 InstallState.INSTALLED_LATEST -> "打开"
             }
         }
@@ -80,7 +82,6 @@ data class AppInfo(
     val progressText: String
         get() = when (downloadStatus) {
             DownloadStatus.DOWNLOADING -> "$progress%"
-            // 【修改】统一改为 "继续"
             DownloadStatus.PAUSED      -> "继续"
             DownloadStatus.VERIFYING   -> "验证中"
             DownloadStatus.INSTALLING  -> "安装中"

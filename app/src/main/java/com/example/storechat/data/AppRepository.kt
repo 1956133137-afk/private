@@ -2,7 +2,6 @@ package com.example.storechat.data
 
 import android.content.Context
 import android.os.Build
-import androidx.annotation.RequiresApi
 import com.example.storechat.util.LogUtil
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
@@ -17,7 +16,6 @@ import com.example.storechat.util.AppUtils
 import com.example.storechat.xc.XcServiceManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -68,15 +66,8 @@ object AppRepository {
     val checkUpdateResult: LiveData<UpdateStatus?> = _checkUpdateResult
 
     val eventMessage = MutableLiveData<String>()
-
-    /**
-     * 新增：专门用于通知用户服务器返回的原始错误信息
-     */
     val downloadErrorEvent = MutableLiveData<String>()
 
-    /**
-     * 清理错误事件，确保只显示一次
-     */
     fun clearDownloadError() {
         downloadErrorEvent.postValue("")
     }
@@ -205,7 +196,6 @@ object AppRepository {
         AppPackageNameCache.init(context)
         XcServiceManager.init(context)
 
-        // 初始化当前应用版本信息
         val verName = AppUtils.getAppVersionName(context)
         currentVersionCode = AppUtils.getAppVersionCode(context)
         _appVersion.postValue("V$verName")
@@ -244,7 +234,8 @@ object AppRepository {
                     versionName = "已暂停", releaseDate = "",
                     downloadStatus = status, progress = finalProgress,
                     currentSizeStr = "",
-                    totalSizeStr = ""
+                    totalSizeStr = "",
+                    installedVersionCode = 0
                 )
             }.filter { it.downloadStatus != DownloadStatus.NONE }
 
@@ -299,7 +290,8 @@ object AppRepository {
                     versionName = "已暂停", releaseDate = "",
                     downloadStatus = status, progress = finalProgress,
                     currentSizeStr = "",
-                    totalSizeStr = ""
+                    totalSizeStr = "",
+                    installedVersionCode = 0
                 )
             }.filter { it.downloadStatus != DownloadStatus.NONE }
 
@@ -364,7 +356,7 @@ object AppRepository {
                             it.appId == serverApp.appId && it.versionId == serverApp.id?.toLong()
                         }
 
-                        val baseInfo = mapToAppInfo(serverApp, localApp).copy(
+                        val baseInfo = mapToAppInfo(serverApp, localApp, installedVersionCode).copy(
                             packageName = finalPackageName,
                             installState = installState,
                             isInstalled = isInstalled
@@ -395,7 +387,7 @@ object AppRepository {
         }
     }
 
-    private fun mapToAppInfo(response: AppInfoResponse, localApp: AppInfo?): AppInfo {
+    private fun mapToAppInfo(response: AppInfoResponse, localApp: AppInfo?, installedVersionCode: Long = 0): AppInfo {
         return AppInfo(
             name = response.productName,
             appId = response.appId,
@@ -413,7 +405,8 @@ object AppRepository {
             downloadStatus = localApp?.downloadStatus ?: DownloadStatus.NONE,
             progress = localApp?.progress ?: 0,
             currentSizeStr = localApp?.currentSizeStr ?: "",
-            totalSizeStr = localApp?.totalSizeStr ?: ""
+            totalSizeStr = localApp?.totalSizeStr ?: "",
+            installedVersionCode = installedVersionCode
         )
     }
 
@@ -464,15 +457,11 @@ object AppRepository {
                     }
                 }
             } catch (e: Exception) {
-                // Ignore errors during background size fetch
             }
         }
     }
 
 
-//    后续修复版本更新
-
-    @RequiresApi(Build.VERSION_CODES.N)
     fun toggleDownload(app: AppInfo) {
         val versionId = app.versionId
         if (versionId == null) {
@@ -509,7 +498,6 @@ object AppRepository {
                     )
                 }
 
-                // 【优化点 1】定义变量记录上一次的进度
                 var lastReportedProgress = -1
 
                 val installedPackageName = XcServiceManager.downloadAndInstall(
@@ -518,7 +506,6 @@ object AppRepository {
                     newVersionCode = app.versionCode ?: -1,
                     url = realApkPath,
                     onProgress = { percent, currentBytes, totalBytes ->
-                        // 【优化点 2】只有进度百分比发生变化时才更新 UI
                         if (percent != lastReportedProgress) {
                             lastReportedProgress = percent
 
@@ -559,7 +546,8 @@ object AppRepository {
                                 packageName = installedPackageName,
                                 isInstalled = true,
                                 currentSizeStr = "",
-                                totalSizeStr = ""
+                                totalSizeStr = "",
+                                installedVersionCode = (app.versionCode ?: -1).toLong()
                             ).also { updatedApp -> newlyInstalledApp = updatedApp }
                         } else {
                             it
@@ -582,9 +570,6 @@ object AppRepository {
                 downloadJobs.remove(key)
             } catch (e: Exception) {
                 LogUtil.e(TAG, "Download/Install failed", e)
-
-                // 【核心修复】将错误信息发送给 UI 层，否则 MainActivity 无法弹出对话框
-                // 提取异常信息，如果是 "安装失败" 这种已知错误，直接显示；否则显示通用提示
                 val msg = e.message ?: "未知错误"
                 downloadErrorEvent.postValue("下载或安装失败: $msg")
 

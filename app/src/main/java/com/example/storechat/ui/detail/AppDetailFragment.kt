@@ -64,16 +64,23 @@ class AppDetailFragment : Fragment() {
             binding.layoutProgress?.setOnClickListener(portraitClickListener)
         }
         
-        // 监听服务器错误事件
+        // 监听服务器错误事件 下载失败版本没有开启使用时，提示用户
         observeDownloadErrors()
     }
 
     private fun observeDownloadErrors() {
         AppRepository.downloadErrorEvent.observe(viewLifecycleOwner) { errorMessage ->
             if (errorMessage != null && errorMessage.isNotEmpty()) {
+                // 根据错误内容，显示自定义提示信息
+                val displayMessage = if (errorMessage.contains("已停止使用")) {
+                    "安装失败：尝试其他版本。"
+                } else {
+                    errorMessage
+                }
+
                 val dialog = AlertDialog.Builder(requireContext())
                     .setTitle("安装提示")
-                    .setMessage(errorMessage)
+                    .setMessage(displayMessage)
                     .setPositiveButton("确定") { d, _ ->
                         d.dismiss()
                     }

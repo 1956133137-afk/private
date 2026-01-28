@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
                     .setCancelable(false)
                     .show()
 
-                // 核心修改：动态设置对话框宽度
+                // 动态设置对话框宽度
                 if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
                     val displayMetrics = resources.displayMetrics
                     val width = (displayMetrics.widthPixels * 0.85).toInt()
