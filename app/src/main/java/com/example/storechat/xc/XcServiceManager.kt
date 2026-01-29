@@ -48,17 +48,17 @@ object XcServiceManager {
                 // 尝试初始化向成服务
                 try {
                     mXCService = MyService(appContext)
-                    LogUtil.i(TAG, "XC service (MyService) initialized")
+                    LogUtil.i(TAG, "XC 服务 (MyService) 已初始化")
                 } catch (e: Throwable) {
-                    LogUtil.w(TAG, "XC service init failed: ${e.message}")
+                    LogUtil.w(TAG, "XC 服务初始化失败: ${e.message}")
                 }
 
                 // 尝试初始化芯伙服务
                 try {
                     mXHService = MyManager.getInstance(appContext)
-                    LogUtil.i(TAG, "XH service (MyManager) initialized")
+                    LogUtil.i(TAG, "XH 服务 (MyManager) 已初始化")
                 } catch (e: Throwable) {
-                    LogUtil.w(TAG, "XH service init failed: ${e.message}")
+                    LogUtil.w(TAG, "XH 服务初始化失败: ${e.message}")
                 }
 
                 // 根据设备型号设置首选主板类型
@@ -68,9 +68,9 @@ object XcServiceManager {
                 }
 
                 isInitialized = true
-                LogUtil.i(TAG, "Service manager initialized. Preferred boardType: $boardType")
+                LogUtil.i(TAG, "服务管理器已初始化。首选主板类型: $boardType")
             } catch (e: Exception) {
-                LogUtil.e(TAG, "Hardware service init error.", e)
+                LogUtil.e(TAG, "硬件服务初始化错误。", e)
                 isInitialized = false
             }
         }
@@ -133,7 +133,7 @@ object XcServiceManager {
                 info.versionCode
             }
 
-            LogUtil.i(TAG, "Starting installation for $realPackageName. Server ver: $newVersionCode, APK real ver: $realVersionCode")
+            LogUtil.i(TAG, "开始为 $realPackageName 安装。服务器版本: $newVersionCode, APK 实际版本: $realVersionCode")
 
             var isInstallSuccessful = false
 
@@ -145,7 +145,7 @@ object XcServiceManager {
             // 方法 2: 如果首选失败...
             if (!isInstallSuccessful) {
                 val altType = if (boardType == 1) 2 else 1
-                LogUtil.i(TAG, "Method 1 failed, 第二种方式: Alternative silent install (Type $altType)")
+                LogUtil.i(TAG, "方法 1 失败, 第二种方式: 替代静默安装 (类型 $altType)")
                 isInstallSuccessful = trySilentInstall(pm, file, realPackageName, realVersionCode, altType)
             }
 
@@ -153,17 +153,17 @@ object XcServiceManager {
 
             // 方法 3: 如果静默安装都失败，尝试标准安装方法
             if (!isInstallSuccessful) {
-                LogUtil.i(TAG, "Silent installation failed, 第三种方式: Standard installation")
+                LogUtil.i(TAG, "静默安装失败, 第三种方式: 标准安装")
                 isInstallSuccessful = tryStandardInstall(file, realPackageName)
             }
 
             if (!isInstallSuccessful) return@withContext null
 
-            LogUtil.i(TAG, "Installation flow completed for: $realPackageName")
+            LogUtil.i(TAG, "安装流程已完成: $realPackageName")
             return@withContext realPackageName
 
         } catch (e: Exception) {
-            LogUtil.e(TAG, "Unexpected error during download and install", e)
+            LogUtil.e(TAG, "下载和安装过程中发生意外错误", e)
             if (e is CancellationException) throw e
             return@withContext null
         }
@@ -188,7 +188,7 @@ object XcServiceManager {
 
             // 1. 如果目标应用已安装，先静默卸载
             if (isAppInstalled(pm, realPackageName)) {
-                LogUtil.i(TAG, "Package $realPackageName exists, attempting silent uninstall via Type $type")
+                LogUtil.i(TAG, "应用包 $realPackageName 已存在，正在尝试通过类型 $type 进行静默卸载")
                 when (type) {
                     1 -> mXCService?.silentUnInstallApk(realPackageName)
                     2 -> mXHService?.selfStart(realPackageName) // 保持原有逻辑
@@ -198,7 +198,7 @@ object XcServiceManager {
                 for (i in 0..4) {
                     delay(1000)
                     if (!isAppInstalled(pm, realPackageName)) {
-                        LogUtil.i(TAG, "Uninstall successful")
+                        LogUtil.i(TAG, "卸载成功")
                         break
                     }
                 }
@@ -206,7 +206,7 @@ object XcServiceManager {
 
             // 2. 执行静默安装
             if (!isAppInstalled(pm, realPackageName)) {
-                LogUtil.i(TAG, "Executing silent install via Type $type")
+                LogUtil.i(TAG, "正在通过类型 $type 执行静默安装")
                 when (type) {
                     1 -> mXCService?.silentInstallApk(file.absolutePath, realPackageName, false)
                     2 -> mXHService?.silentInstallApk(file.absolutePath, false)
@@ -219,7 +219,7 @@ object XcServiceManager {
 
                     // 增加日志方便调试，看看到底读到了什么版本
                     if (i % 5 == 0) { // 每5秒打印一次
-                        LogUtil.d(TAG, "Checking install status ($i/100): current=$installedVersion, target=$newVersionCode")
+                        LogUtil.d(TAG, "检查安装状态 ($i/100): 当前=$installedVersion, 目标=$newVersionCode")
                     }
 
                     if (installedVersion >= newVersionCode) {
@@ -229,7 +229,7 @@ object XcServiceManager {
                 }
             }
         } catch (e: Exception) {
-            LogUtil.e(TAG, "Error in trySilentInstall (Type $type): ${e.message}")
+            LogUtil.e(TAG, "trySilentInstall 错误 (类型 $type): ${e.message}")
             if (e is CancellationException) throw e
         }
         return false
@@ -237,65 +237,64 @@ object XcServiceManager {
 
 
     /**
-     * 尝试使用标准安装方法（复制到公共目录 + 绕过校验）
+     * 修复版标准安装：
+     * 1. 使用 FileProvider 兼容 Android 7.0+
+     * 2. 【关键】创建临时副本，防止原文件被上层逻辑立即删除导致安装器读不到文件
+     * 3. 添加 ClipData 和权限标志，确保安装器有权读取
      */
     private suspend fun tryStandardInstall(apkFile: File, packageName: String): Boolean = withContext(Dispatchers.IO) {
-        // 定义一个临时文件在公共下载目录，这是系统安装器绝对有权限访问的地方
-        val publicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        if (!publicDir.exists()) publicDir.mkdirs()
-
-        // 为了防止文件名冲突导致解析错误，使用固定名字或时间戳
-        val targetFile = File(publicDir, "update_temp_${System.currentTimeMillis()}.apk")
-
         try {
-            LogUtil.i(TAG, "Copying APK to public directory: ${targetFile.absolutePath}")
+            // 1. 创建临时文件副本
+            // 原因：downloadAndInstall 返回后，上层会立即删除 apkFile。
+            // 如果直接传原文件，系统安装器还没来得及读，文件就没了，导致 "Cannot parse package"。
+            val tempDir = apkFile.parentFile ?: appContext.cacheDir
+            val tempFile = File(tempDir, "install_temp_${System.currentTimeMillis()}.apk")
 
-            // 1. 将文件复制到公共目录 (解决私有目录权限问题)
-            apkFile.copyTo(targetFile, overwrite = true)
-
-            // 2. 暴力赋予 777 权限 (解决 Linux 文件权限问题)
+            // 清理旧的临时文件 (超过5分钟的)
             try {
-                val p = Runtime.getRuntime().exec("chmod 777 ${targetFile.absolutePath}")
-                p.waitFor()
-            } catch (e: Exception) {
-                LogUtil.w(TAG, "Chmod failed: ${e.message}")
-            }
-
-            // 3. 禁用 Android 7.0+ 的 FileUriExposed 检查 (强制允许 file:// 协议)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                try {
-                    val builder = android.os.StrictMode.VmPolicy.Builder()
-                    android.os.StrictMode.setVmPolicy(builder.build())
-                } catch (e: Exception) {
-                    LogUtil.e(TAG, "Disable StrictMode failed: ${e.message}")
+                tempDir.listFiles()?.forEach {
+                    if (it.name.startsWith("install_temp_") &&
+                        System.currentTimeMillis() - it.lastModified() > 300_000) {
+                        it.delete()
+                    }
                 }
-            }
+            } catch (e: Exception) {}
 
-            // 4. 启动安装
+            LogUtil.i(TAG, "正在复制 APK 到临时文件: ${tempFile.absolutePath}")
+            apkFile.copyTo(tempFile, overwrite = true)
+
+            // 2. 尝试修改权限 (兜底措施，确保可读)
+            try {
+                val p = Runtime.getRuntime().exec("chmod 644 ${tempFile.absolutePath}")
+                p.waitFor()
+            } catch (e: Exception) {}
+
             withContext(Dispatchers.Main) {
+                // 3. 获取 FileProvider URI
+                // 注意：authority 必须与 AndroidManifest.xml 一致
+                val authority = "${appContext.packageName}.fileprovider"
+                val contentUri = FileProvider.getUriForFile(appContext, authority, tempFile)
+
+                LogUtil.i(TAG, "生成的内容 URI: $contentUri")
+
                 val intent = Intent(Intent.ACTION_VIEW)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                // 关键：授予读权限
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
-                // 直接使用文件路径 URI
-                val uri = Uri.fromFile(targetFile)
-                LogUtil.i(TAG, "Starting installation with public file: $uri")
+                // 关键：兼容 Android 10+ 和部分定制 ROM，显式设置 ClipData 以增强权限传递稳定性
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    intent.clipData = android.content.ClipData.newRawUri("archive", contentUri)
+                }
 
-                intent.setDataAndType(uri, "application/vnd.android.package-archive")
+                intent.setDataAndType(contentUri, "application/vnd.android.package-archive")
+
                 appContext.startActivity(intent)
+                LogUtil.i(TAG, "标准安装意图发送成功。")
             }
             true
         } catch (e: Exception) {
-            LogUtil.e(TAG, "Failed to copy/install APK: ${e.message}")
-            e.printStackTrace()
-            // 如果复制失败，尝试直接用源文件兜底（虽然很大概率还是不行）
-            withContext(Dispatchers.Main) {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW)
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    intent.setDataAndType(Uri.fromFile(apkFile), "application/vnd.android.package-archive")
-                    appContext.startActivity(intent)
-                } catch (ex: Exception) {}
-            }
+            LogUtil.e(TAG, "标准安装失败: ${e.message}", e)
             false
         }
     }
