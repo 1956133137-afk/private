@@ -166,7 +166,7 @@ object XcServiceManager {
     }
 
     /**
-     * 尝试静默安装 (修复降级死循环版)
+     * 尝试静默安装 ()
      */
     private suspend fun trySilentInstall(
         pm: PackageManager,
@@ -220,12 +220,12 @@ object XcServiceManager {
 
                                     // 如果 SDK 依然不行，使用 Root 命令兜底
                                     if (!sdkResult) {
-                                        execRootCmd("pm uninstall $realPackageName")
+//                                        execRootCmd("pm uninstall $realPackageName")
                                     }
                                 }
                             }
                         } catch (e: Exception) {
-                            execRootCmd("pm uninstall $realPackageName")
+//                            execRootCmd("pm uninstall $realPackageName")
                         }
                     }
                     delay(1000)
@@ -233,10 +233,10 @@ object XcServiceManager {
             }
 
             // 再次检查卸载结果
-            if (isDowngrade && isAppInstalled(pm, realPackageName)) {
-                LogUtil.e(TAG, "【警告】卸载未完成，尝试使用降级参数 (-d) 强行覆盖")
-                execRootCmd("pm install -r -d ${file.absolutePath}")
-            }
+//            if (isDowngrade && isAppInstalled(pm, realPackageName)) {
+//                LogUtil.e(TAG, "【警告】卸载未完成，尝试使用降级参数 (-d) 强行覆盖")
+//                execRootCmd("pm install -r -d ${file.absolutePath}")
+//            }
 
             // -----------------------------------------------------------
             // 2. 安装阶段
@@ -249,18 +249,24 @@ object XcServiceManager {
                     // 绑定服务后，silentInstallApk 应该能正常工作
                     mXHService?.silentInstallApk(file.absolutePath, false)
 
-                    if (isDowngrade) {
-                        execRootCmd("pm install -r -d ${file.absolutePath}")
-                    }
+//                    if (isDowngrade) {
+//                        execRootCmd("pm install -r -d ${file.absolutePath}")
+//                    }
                 }
             }
 
             // -----------------------------------------------------------
             // 3. 结果校验
             // -----------------------------------------------------------
-            for (i in 0..24) {
+            for (i in 0..64) {
                 delay(1000)
                 val installedVer = getInstalledVersionCode(pm, realPackageName)
+
+
+                // 每5秒打印一次安装状态
+                if (i % 5 == 0) {
+                    LogUtil.i(TAG, "检查安装状态 ($i/65): 当前版本=$installedVer, 目标版本=$newVersionCode")
+                }
 
                 if (installedVer == newVersionCode) {
                     LogUtil.i(TAG, "安装成功：当前版本 $installedVer")
@@ -268,10 +274,10 @@ object XcServiceManager {
                 }
 
                 // 补救措施
-                if (type == 2 && i > 0 && i % 5 == 0 && installedVer != newVersionCode) {
-                    LogUtil.w(TAG, "安装未生效，重试 Root 命令...")
-                    execRootCmd("pm install -r -d ${file.absolutePath}")
-                }
+//                if (type == 2 && i > 0 && i % 5 == 0 && installedVer != newVersionCode) {
+//                    LogUtil.w(TAG, "安装未生效，重试 Root 命令...")
+////                    execRootCmd("pm install -r -d ${file.absolutePath}")
+//                }
             }
 
         } catch (e: Exception) {
@@ -280,21 +286,21 @@ object XcServiceManager {
         return false
     }
 
-    /**
-     * 通用 Shell 命令执行器
-     */
-    private fun execRootCmd(cmd: String) {
-        try {
-            // 尝试以 Root 身份执行
-            Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
-        } catch (e: Exception) {
-            try {
-                Runtime.getRuntime().exec(cmd)
-            } catch (e2: Exception) {
-                LogUtil.e(TAG, "Shell命令执行失败: $cmd")
-            }
-        }
-    }
+//    /**
+//     * 通用 Shell 命令执行器
+//     */
+//    private fun execRootCmd(cmd: String) {
+//        try {
+//            // 尝试以 Root 身份执行
+//            Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
+//        } catch (e: Exception) {
+//            try {
+//                Runtime.getRuntime().exec(cmd)
+//            } catch (e2: Exception) {
+//                LogUtil.e(TAG, "Shell命令执行失败: $cmd")
+//            }
+//        }
+//    }
 
 
     private suspend fun tryStandardInstall(apkFile: File, packageName: String): Boolean = withContext(Dispatchers.IO) {
