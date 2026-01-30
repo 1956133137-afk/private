@@ -3,7 +3,6 @@ package com.example.storechat.xc
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import androidx.core.content.FileProvider
@@ -18,12 +17,11 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * XcServiceManager - 静默安装管理器
- *
- * 支持三种安装方法：
- * 1. 优先使用匹配主板类型的静默安装服务
- * 2. 如果失败，尝试另一种主板类型的静默安装服务
- * 3. 如果依然失败，使用标准安装（Intent）
+ * XcServiceManager - 静默安装管理器 (修复版)
+ * 修复内容：
+ * 1. [关键] init() 中增加了 bindAIDLService 调用，解决 API 无效的问题。
+ * 2. 针对降级安装，采用“死磕卸载”策略，确保先卸载再安装。
+ * 3. 移除了不存在的 execSuCmd，使用 execRootCmd 兜底。
  */
 object XcServiceManager {
     private const val TAG = "XcServiceManager"
@@ -56,7 +54,9 @@ object XcServiceManager {
                 // 尝试初始化芯伙服务
                 try {
                     mXHService = MyManager.getInstance(appContext)
-                    LogUtil.i(TAG, "XH 服务 (MyManager) 已初始化")
+                    // 【关键修复】根据文档 Page 9，必须调用 bindAIDLService
+                    mXHService?.bindAIDLService(appContext)
+                    LogUtil.i(TAG, "XH 服务 (MyManager) 已初始化并绑定 AIDL")
                 } catch (e: Throwable) {
                     LogUtil.w(TAG, "XH 服务初始化失败: ${e.message}")
                 }
@@ -100,12 +100,12 @@ object XcServiceManager {
     }
 
     /**
-     * 下载并安装APK，采用三级回退机制
+     * 下载并安装APK
      */
     suspend fun downloadAndInstall(
         appId: String,
         versionId: Long,
-        newVersionCode: Int, // 这个是服务器返回的版本号，可能不准
+        newVersionCode: Int,
         url: String,
         onProgress: ((progress: Int, currentBytes: Long, totalBytes: Long) -> Unit)?
     ): String? = withContext(Dispatchers.IO) {
@@ -124,8 +124,7 @@ object XcServiceManager {
                 return@withContext null
             }
 
-            // 【核心修复】直接从下载的 APK 文件中读取真实版本号
-            // 如果 APK 本身是 57，我们就以 57 为目标，而不是死等服务器说的 58
+            // 读取 APK 实际版本号
             val realVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 info.longVersionCode.toInt()
             } else {
@@ -138,7 +137,6 @@ object XcServiceManager {
             var isInstallSuccessful = false
 
             // 方法 1: 使用首选静默安装服务
-            // 注意：这里传入 realVersionCode 而不是 newVersionCode
             LogUtil.i(TAG, "第一种方式: Preferred silent install (Type $boardType)")
             isInstallSuccessful = trySilentInstall(pm, file, realPackageName, realVersionCode, boardType)
 
@@ -149,9 +147,7 @@ object XcServiceManager {
                 isInstallSuccessful = trySilentInstall(pm, file, realPackageName, realVersionCode, altType)
             }
 
-            // ... (后续逻辑保持不变)
-
-            // 方法 3: 如果静默安装都失败，尝试标准安装方法
+            // 方法 3: 标准安装
             if (!isInstallSuccessful) {
                 LogUtil.i(TAG, "静默安装失败, 第三种方式: 标准安装")
                 isInstallSuccessful = tryStandardInstall(file, realPackageName)
@@ -170,7 +166,7 @@ object XcServiceManager {
     }
 
     /**
-     * 尝试静默安装
+     * 尝试静默安装 (修复降级死循环版)
      */
     private suspend fun trySilentInstall(
         pm: PackageManager,
@@ -182,79 +178,132 @@ object XcServiceManager {
         if (!isInitialized) return false
 
         try {
-            // 检查对应服务是否可用
             if (type == 1 && mXCService == null) return false
             if (type == 2 && mXHService == null) return false
 
-            // 1. 如果目标应用已安装，先静默卸载
-            if (isAppInstalled(pm, realPackageName)) {
-                LogUtil.i(TAG, "应用包 $realPackageName 已存在，正在尝试通过类型 $type 进行静默卸载")
-                when (type) {
-                    1 -> mXCService?.silentUnInstallApk(realPackageName)
-                    2 -> mXHService?.selfStart(realPackageName) // 保持原有逻辑
-                }
+            val currentVersion = getInstalledVersionCode(pm, realPackageName)
 
-                // 等待卸载完成 (最多5秒)
-                for (i in 0..4) {
-                    delay(1000)
+            // 0. 版本一致且应用存在，直接成功
+            if (currentVersion == newVersionCode) {
+                LogUtil.i(TAG, "版本一致 ($currentVersion)，跳过安装")
+                return true
+            }
+
+            val isDowngrade = currentVersion > newVersionCode && currentVersion != -1
+            if (isDowngrade) {
+                LogUtil.w(TAG, "检测到降级 ($currentVersion -> $newVersionCode)，准备强制卸载")
+            }
+
+            // -----------------------------------------------------------
+            // 1. 卸载阶段 (死磕模式：绑定服务后 unInstallApk 应该生效了)
+            // -----------------------------------------------------------
+            if (isAppInstalled(pm, realPackageName)) {
+                // 降级时给 15秒，普通更新给 5秒
+                val maxRetry = if (isDowngrade) 15 else 5
+
+                for (i in 0 until maxRetry) {
                     if (!isAppInstalled(pm, realPackageName)) {
-                        LogUtil.i(TAG, "卸载成功")
+                        LogUtil.i(TAG, "检测到旧版本已卸载")
                         break
                     }
-                }
-            }
 
-            // 2. 执行静默安装
-            if (!isAppInstalled(pm, realPackageName)) {
-                LogUtil.i(TAG, "正在通过类型 $type 执行静默安装")
-                when (type) {
-                    1 -> mXCService?.silentInstallApk(file.absolutePath, realPackageName, false)
-                    2 -> mXHService?.silentInstallApk(file.absolutePath, false)
-                }
+                    // 每 3秒 执行一次卸载指令
+                    if (i == 0 || i % 3 == 0) {
+                        LogUtil.i(TAG, "执行卸载指令... ($i/$maxRetry)")
+                        try {
+                            when (type) {
+                                1 -> mXCService?.silentUnInstallApk(realPackageName)
+                                2 -> {
+                                    // 【核心】绑定服务后，unInstallApk 应该能返回 true
+                                    // 如果 jar 包版本支持，此处应该不再是瓶颈
+                                    val sdkResult = mXHService?.unInstallApk(realPackageName) ?: false
 
-                // 将等待时间从 60秒 (0..59) 增加到 100秒 (0..99)
-                for (i in 0..24) {
+                                    // 如果 SDK 依然不行，使用 Root 命令兜底
+                                    if (!sdkResult) {
+                                        execRootCmd("pm uninstall $realPackageName")
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            execRootCmd("pm uninstall $realPackageName")
+                        }
+                    }
                     delay(1000)
-                    val installedVersion = getInstalledVersionCode(pm, realPackageName)
+                }
+            }
 
-                    // 增加日志方便调试，看看到底读到了什么版本
-                    if (i % 5 == 0) { // 每5秒打印一次
-                        LogUtil.d(TAG, "检查安装状态 ($i/100): 当前=$installedVersion, 目标=$newVersionCode")
-                    }
+            // 再次检查卸载结果
+            if (isDowngrade && isAppInstalled(pm, realPackageName)) {
+                LogUtil.e(TAG, "【警告】卸载未完成，尝试使用降级参数 (-d) 强行覆盖")
+                execRootCmd("pm install -r -d ${file.absolutePath}")
+            }
 
-                    if (installedVersion >= newVersionCode) {
-                        LogUtil.i(TAG, "Silent install 成功 via 方式 $type")
-                        return true
+            // -----------------------------------------------------------
+            // 2. 安装阶段
+            // -----------------------------------------------------------
+            LogUtil.i(TAG, "执行安装命令 (类型 $type)")
+
+            when (type) {
+                1 -> mXCService?.silentInstallApk(file.absolutePath, realPackageName, false)
+                2 -> {
+                    // 绑定服务后，silentInstallApk 应该能正常工作
+                    mXHService?.silentInstallApk(file.absolutePath, false)
+
+                    if (isDowngrade) {
+                        execRootCmd("pm install -r -d ${file.absolutePath}")
                     }
                 }
             }
+
+            // -----------------------------------------------------------
+            // 3. 结果校验
+            // -----------------------------------------------------------
+            for (i in 0..24) {
+                delay(1000)
+                val installedVer = getInstalledVersionCode(pm, realPackageName)
+
+                if (installedVer == newVersionCode) {
+                    LogUtil.i(TAG, "安装成功：当前版本 $installedVer")
+                    return true
+                }
+
+                // 补救措施
+                if (type == 2 && i > 0 && i % 5 == 0 && installedVer != newVersionCode) {
+                    LogUtil.w(TAG, "安装未生效，重试 Root 命令...")
+                    execRootCmd("pm install -r -d ${file.absolutePath}")
+                }
+            }
+
         } catch (e: Exception) {
-            LogUtil.e(TAG, "trySilentInstall 错误 (类型 $type): ${e.message}")
-            if (e is CancellationException) throw e
+            LogUtil.e(TAG, "trySilentInstall 异常: ${e.message}")
         }
         return false
     }
 
-
     /**
-     * 修复版标准安装：
-     * 1. 使用 FileProvider 兼容 Android 7.0+
-     * 2. 【关键】创建临时副本，防止原文件被上层逻辑立即删除导致安装器读不到文件
-     * 3. 添加 ClipData 和权限标志，确保安装器有权读取
+     * 通用 Shell 命令执行器
      */
+    private fun execRootCmd(cmd: String) {
+        try {
+            // 尝试以 Root 身份执行
+            Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
+        } catch (e: Exception) {
+            try {
+                Runtime.getRuntime().exec(cmd)
+            } catch (e2: Exception) {
+                LogUtil.e(TAG, "Shell命令执行失败: $cmd")
+            }
+        }
+    }
+
+
     private suspend fun tryStandardInstall(apkFile: File, packageName: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            // 1. 创建临时文件副本
-            // 原因：downloadAndInstall 返回后，上层会立即删除 apkFile。
-            // 如果直接传原文件，系统安装器还没来得及读，文件就没了，导致 "Cannot parse package"。
             val tempDir = apkFile.parentFile ?: appContext.cacheDir
             val tempFile = File(tempDir, "install_temp_${System.currentTimeMillis()}.apk")
-
-            // 清理旧的临时文件 (超过5分钟的)
             try {
                 tempDir.listFiles()?.forEach {
-                    if (it.name.startsWith("install_temp_") &&
-                        System.currentTimeMillis() - it.lastModified() > 300_000) {
+                    if (it.name.startsWith("install_temp_") && System.currentTimeMillis() - it.lastModified() > 300_000) {
                         it.delete()
                     }
                 }
@@ -262,33 +311,21 @@ object XcServiceManager {
 
             LogUtil.i(TAG, "正在复制 APK 到临时文件: ${tempFile.absolutePath}")
             apkFile.copyTo(tempFile, overwrite = true)
-
-            // 2. 尝试修改权限 (兜底措施，确保可读)
             try {
-                val p = Runtime.getRuntime().exec("chmod 644 ${tempFile.absolutePath}")
-                p.waitFor()
+                Runtime.getRuntime().exec("chmod 644 ${tempFile.absolutePath}").waitFor()
             } catch (e: Exception) {}
 
             withContext(Dispatchers.Main) {
-                // 3. 获取 FileProvider URI
-                // 注意：authority 必须与 AndroidManifest.xml 一致
                 val authority = "${appContext.packageName}.fileprovider"
                 val contentUri = FileProvider.getUriForFile(appContext, authority, tempFile)
-
                 LogUtil.i(TAG, "生成的内容 URI: $contentUri")
-
                 val intent = Intent(Intent.ACTION_VIEW)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                // 关键：授予读权限
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-
-                // 关键：兼容 Android 10+ 和部分定制 ROM，显式设置 ClipData 以增强权限传递稳定性
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                     intent.clipData = android.content.ClipData.newRawUri("archive", contentUri)
                 }
-
                 intent.setDataAndType(contentUri, "application/vnd.android.package-archive")
-
                 appContext.startActivity(intent)
                 LogUtil.i(TAG, "标准安装意图发送成功。")
             }
@@ -310,15 +347,12 @@ object XcServiceManager {
         val dir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: appContext.filesDir
         if (!dir.exists()) dir.mkdirs()
         val file = File(dir, fileName)
-
         val requestBuilder = Request.Builder().url(url)
         var downloadedBytes = 0L
-
         if (file.exists()) {
             downloadedBytes = file.length()
             requestBuilder.addHeader("Range", "bytes=$downloadedBytes-")
         }
-
         val request = requestBuilder.build()
         var response: Response? = null
         try {
@@ -328,22 +362,18 @@ object XcServiceManager {
                 return null
             }
             if (response.code == 404) return null
-
             val isResumable = response.code == 206
             if (!response.isSuccessful && !isResumable) {
                 if (file.exists()) file.delete()
                 return null
             }
-
             if (file.exists() && downloadedBytes > 0 && !isResumable) {
                 file.delete()
                 downloadedBytes = 0
             }
-
             val body = response.body ?: return null
             val contentLength = body.contentLength()
             val totalBytes = if (contentLength == -1L) -1L else contentLength + downloadedBytes
-
             body.byteStream().use { inputStream ->
                 FileOutputStream(file, downloadedBytes > 0 && isResumable).use { outputStream ->
                     var currentBytes = downloadedBytes
