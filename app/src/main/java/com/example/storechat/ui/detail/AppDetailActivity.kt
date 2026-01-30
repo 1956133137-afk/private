@@ -48,9 +48,6 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         }
 
         if (appInfo != null) {
-            // ** THE FIX IS HERE **
-            // We should use setAppInfo, which is designed to handle the initial setup.
-            // Using setHistoryAppInfo incorrectly triggers the history override logic.
             viewModel.setAppInfo(appInfo)
         } else {
             val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME)
@@ -67,7 +64,6 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
     }
 
     fun openDrawer() {
-        // 在横屏模式下，binding.drawerLayout
         binding.drawerLayout?.openDrawer(GravityCompat.END)
     }
 
@@ -80,12 +76,10 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
 
         binding.ivSearch.setOnClickListener {
             if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                // 横屏模式下跳转到首页
                 val intent = Intent(this, MainActivity::class.java)
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 startActivity(intent)
             } else {
-                // 竖屏模式下保持原有逻辑
                 SearchActivity.start(this)
             }
         }
@@ -114,14 +108,11 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
             }
         }
 
-        // 移除方向判断，为所有方向设置点击监听器
+
         binding.btnInstall?.setOnClickListener(clickListener)
         binding.layoutProgress?.setOnClickListener(clickListener)
 //
-//        if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
-//            binding.btnInstall?.setOnClickListener(clickListener)
-//            binding.layoutProgress?.setOnClickListener(clickListener)
-//        }
+
     }
 
     private fun setupViewPagerAndTabs() {
@@ -139,7 +130,7 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
             tab.customView = customView
         }.attach()
 
-        // 确保 onTabSelected 只有以下逻辑，不要额外添加重置数据的代码
+
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 tab?.customView?.isSelected = true
@@ -172,26 +163,22 @@ class AppDetailActivity : AppCompatActivity(), CustomAdapt {
         viewModel.switchToTab.observe(this) { tabIndex ->
             binding.viewPager.setCurrentItem(tabIndex, true)
         }
-        // 【新增】监听 AppInfo 变化，处理 100% 进度时的“安装中”状态
+
         viewModel.appInfo.observe(this) { appInfo ->
             if (appInfo == null) return@observe
 
             val btn = binding.btnInstall
-            // 仅在按钮存在时操作（防止横竖屏布局差异导致为空）
             if (btn != null) {
                 if (appInfo.downloadStatus == DownloadStatus.DOWNLOADING) {
                     if (appInfo.progress >= 100) {
-                        // 1. 下载完成但尚未安装完成 -> 显示“安装中”
                         btn.text = "安装中"
-                        btn.isEnabled = false // 禁止重复点击
+                        btn.isEnabled = false
                     } else {
-                        // 2. 正常下载中 -> 显示进度
                         btn.text = "${appInfo.progress}%"
                         btn.isEnabled = true
                     }
                 }
-                // 其他状态（如 PAUSED, NONE, INSTALLED）通常由 XML DataBinding 处理
-                // 如果发现 DataBinding 覆盖了这里的设置，可以在 else 分支强制刷新状态
+
             }
         }
     }

@@ -22,7 +22,7 @@ class HomeViewModel : ViewModel() {
 
     private val TAG = "HomeViewModel"
 
-    // --- 基础 UI 数据 --- //
+
     val appVersion: LiveData<String>
 
     private val _appsMediator = MediatorLiveData<List<AppInfo>>()
@@ -43,11 +43,11 @@ class HomeViewModel : ViewModel() {
 
     private val sizeFetchTracker = mutableSetOf<String>()
 
-    // ============ 首页内联搜索（横屏用） ============
+
 
     private val _searchKeyword = MutableLiveData("")
 
-    // ============ 下载图标相关状态 ============
+
 
     private val downloadQueue: LiveData<List<AppInfo>> = AppRepository.downloadQueue
 
@@ -91,9 +91,8 @@ class HomeViewModel : ViewModel() {
         checkUpdateResult = AppRepository.checkUpdateResult
 
         _appsMediator.addSource(AppRepository.categorizedApps) { list ->
-            // Only act on non-empty lists, which signify a successful data load.
             if (!list.isNullOrEmpty()) {
-                timeoutJob?.cancel() // Success, cancel the timeout.
+                timeoutJob?.cancel()
                 _isLoading.value = false
                 _showNetworkError.value = false
 
@@ -102,7 +101,6 @@ class HomeViewModel : ViewModel() {
                 val kw = _searchKeyword.value.orEmpty()
                 _appsMediator.value = filterApps(list, kw)
             }
-            // If the list is empty, do nothing and let the timeout handle it.
         }
 
         _appsMediator.addSource(_searchKeyword) { kw ->
@@ -122,7 +120,7 @@ class HomeViewModel : ViewModel() {
     private fun filterApps(apps: List<AppInfo>?, keyword: String): List<AppInfo> {
         val list = apps ?: emptyList()
 
-        // 核心修改：过滤掉大小为空、"N/A" 或 "0B" 的软件
+    
         val filteredBySize = list.filter { app ->
             app.size.isNotBlank() && app.size != "N/A" && app.size != "0B"
         }

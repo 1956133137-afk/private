@@ -46,7 +46,7 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        setupRecyclerView() // Call this first to ensure adapter is ready
+        setupRecyclerView()
         setupViews()
         observeViewModel()
 
@@ -252,7 +252,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun openDetail(app: AppInfo) {
-//        AppDetailActivity.start(requireContext(), app)
+
         AppDetailActivity.startWithAppInfo(requireContext(), app)
 
     }

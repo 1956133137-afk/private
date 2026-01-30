@@ -11,7 +11,7 @@ import com.example.storechat.model.UpdateStatus
 
 class SearchViewModel : ViewModel() {
 
-    // --- LiveData for UI --- //
+
     val appVersion: LiveData<String>
     val checkUpdateResult: LiveData<UpdateStatus?>
     val result: LiveData<List<AppInfo>>
@@ -35,7 +35,7 @@ class SearchViewModel : ViewModel() {
         }
     }
 
-    // --- Business Logic --- //
+
 
     fun handleAppAction(app: AppInfo) {
         if (app.installState == InstallState.INSTALLED_LATEST) {
@@ -48,7 +48,7 @@ class SearchViewModel : ViewModel() {
     private fun filterApps(apps: List<AppInfo>?, keyword: String): List<AppInfo> {
         val appList = apps ?: emptyList()
         
-        // 核心修改：过滤掉大小为空、"N/A" 或 "0B" 的软件
+    
         val filteredBySize = appList.filter { app ->
             app.size.isNotBlank() && app.size != "N/A" && app.size != "0B"
         }

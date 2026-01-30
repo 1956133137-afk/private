@@ -10,10 +10,10 @@ import com.example.storechat.model.DownloadTask
 
 class DownloadQueueViewModel : ViewModel() {
 
-    // 监听 Repository 的全局事件消息
+
     val eventMessage: LiveData<String> = AppRepository.eventMessage
 
-    // region Data for Landscape (Single Task) - DEPRECATED but kept for compatibility
+
     val activeTask: LiveData<DownloadTask?> = AppRepository.downloadQueue.map { queue ->
         queue.firstOrNull()?.let { app ->
             DownloadTask(
@@ -32,7 +32,7 @@ class DownloadQueueViewModel : ViewModel() {
         activeTask.value?.let { AppRepository.toggleDownload(it.app) }
     }
 
-    @Deprecated("Use cancelDownload(task) instead")
+
     fun cancelDownload() {
         activeTask.value?.let {
             AppRepository.removeDownload(it.app)
@@ -41,7 +41,7 @@ class DownloadQueueViewModel : ViewModel() {
     }
     // endregion
 
-    // region Data for Portrait (Multi Task)
+
     val downloadTasks: LiveData<List<DownloadTask>> = AppRepository.downloadQueue.map { queue ->
         queue.mapIndexed { index, app ->
             DownloadTask(
@@ -66,7 +66,7 @@ class DownloadQueueViewModel : ViewModel() {
     }
     // endregion
 
-    // region Common Data & Actions
+
     val recentInstalled: LiveData<List<AppInfo>> = AppRepository.recentInstalledApps
 
     private val _toastMessage = MutableLiveData<String?>()

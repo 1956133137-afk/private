@@ -37,10 +37,10 @@ class SearchActivity : AppCompatActivity() {
         observeViewModel()
 
         val initialQuery = intent.getStringExtra(EXTRA_QUERY)
-        // 修正：增加非空判断逻辑
+
         if (!initialQuery.isNullOrEmpty() && initialQuery != "null") {
             binding.etQuery.setText(initialQuery)
-            // 移动光标到末尾
+
             binding.etQuery.setSelection(initialQuery.length)
             performSearch()
         }
@@ -53,7 +53,7 @@ class SearchActivity : AppCompatActivity() {
         )
         binding.recyclerSearchResult.adapter = adapter
 
-        // 为搜索图标添加点击事件
+
         binding.ivSearch.setOnClickListener { performSearch() }
 
         binding.etQuery.setOnEditorActionListener { _, actionId, _ ->
@@ -73,7 +73,6 @@ class SearchActivity : AppCompatActivity() {
     private fun performSearch() {
         val query = binding.etQuery.text.toString().trim()
         if (query.isNotEmpty()) {
-            // ★ 优化：搜索时自动收起软键盘，避免遮挡结果
             hideKeyboard()
             viewModel.search(query)
         }
@@ -83,15 +82,12 @@ class SearchActivity : AppCompatActivity() {
         viewModel.result.observe(this) { list ->
             adapter.submitList(list)
 
-            // ★ 优化：根据结果控制 空状态 和 列表 的显示/隐藏
             val isEmpty = list.isEmpty()
-            // 如果 query 为空（初始状态），也不显示空页面，只有搜了没结果才显示
             val hasQuery = !binding.etQuery.text.isNullOrEmpty()
 
             binding.layoutEmptyState?.isVisible = isEmpty && hasQuery
             binding.recyclerSearchResult.isVisible = !isEmpty
 
-            // 版本号始终显示，或者根据需求处理
             binding.tvVersion?.isVisible = true
         }
 
@@ -117,7 +113,7 @@ class SearchActivity : AppCompatActivity() {
         }
     }
 
-    // ★ 新增辅助方法：收起软键盘
+
     private fun hideKeyboard() {
         val view = this.currentFocus
         if (view != null) {

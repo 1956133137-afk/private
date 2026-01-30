@@ -211,19 +211,19 @@ object AppRepository {
             val entities = downloadDao.getAllTasks()
             val restoredQueue = entities.map { entity ->
                 var status = DownloadStatus.values().getOrElse(entity.status) { DownloadStatus.NONE }
-                // 1. 如果之前是下载中，重启后改为暂停
+
                 if (status == DownloadStatus.DOWNLOADING) {
                     status = DownloadStatus.PAUSED
                 }
 
-                // 2. 【核心修复】移除文件检测导致任务被删除的逻辑
-                // 原代码：如果状态是暂停且文件不存在，设为 NONE (导致被 filter 过滤掉)
-                // 现逻辑：检查文件是否存在，如果不存在仅将进度归零，但保留任务（状态保持 PAUSED）
+
+
+
                 val fileExists = entity.savePath.isNotBlank() && File(entity.savePath).exists()
 
                 if (status == DownloadStatus.PAUSED && !fileExists) {
-                    // 文件丢了，但任务保留，用户可以点击重试
-                    // 保持 status = PAUSED
+    
+    
                 }
 
                 val finalProgress = if (fileExists) entity.progress else 0
@@ -278,11 +278,11 @@ object AppRepository {
                 if (status == DownloadStatus.DOWNLOADING && !isJobRunning) {
                     status = DownloadStatus.PAUSED
                 }
-                // 【核心修复】同步 initialize 的修复逻辑，防止刷新时任务消失
+
                 val fileExists = entity.savePath.isNotBlank() && File(entity.savePath).exists()
 
                 if (status == DownloadStatus.PAUSED && !fileExists) {
-                    // 保持 PAUSED，不设为 NONE
+    
                 }
                 val finalProgress = if (status == DownloadStatus.NONE) 0 else entity.progress
 
@@ -330,14 +330,14 @@ object AppRepository {
     }
 
     private suspend fun refreshAppsFromServer(context: Context, category: AppCategory?) {
-        // 在主线程立即显示加载圈
+        
         withContext(Dispatchers.Main) {
             _isLoading.value = true
         }
         try {
             val response = apiService.getAppList(AppListRequestBody(appCategory = category?.id))
 
-            // 数据处理逻辑保持在 IO 线程，不阻塞主线程
+
             val updatedList = if (response.code == 200 && response.data != null) {
                 val distinctList = response.data
                     .groupBy { it.appId }
@@ -390,25 +390,25 @@ object AppRepository {
 
                     val otherCategoryApps = localAllApps.filter { it.category != category }
                     localAllApps = otherCategoryApps + mergedRemoteList
-                    // 返回最新列表
+        
                     localAllApps
                 }
-//                _isLoading.postValue(false)
+
             } else {
-                // 失败时返回本地缓存
+    
                 synchronized(stateLock) {
                     localAllApps.filter { it.category == category }
                 }
             }
 
-            // 切换回主线程更新 UI 数据
-            // 此时 loading 还是 true，确保列表先渲染
+
+
             withContext(Dispatchers.Main) {
                 _allApps.value = updatedList
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            // 异常时也要更新数据（显示缓存）
+
             val fallbackList = synchronized(stateLock) {
                 localAllApps.filter { it.category == category }
             }
@@ -416,10 +416,10 @@ object AppRepository {
                 _allApps.value = fallbackList
             }
         } finally {
-            // 【关键优化】
-            // 1. 放在 finally 块中，确保无论成功失败都会执行
-            // 2. 此时 _allApps.value 已经赋值，主线程消息队列中 列表更新消息 排在 Loading关闭消息 之前
-            // 3. 从而实现了“数据加载出来后，再停止加载圈”的效果
+
+
+
+
             withContext(Dispatchers.Main) {
                 _isLoading.value = false
             }
@@ -457,13 +457,13 @@ object AppRepository {
                 return response.data.fileUrl to fileSize
             } else {
                 val errorMsg = response.msg ?: "获取下载地址失败"
-//                downloadErrorEvent.postValue(errorMsg)
+
                 throw IOException(errorMsg)
             }
         } catch (e: Exception) {
-//            if (e !is IOException) {
-//                downloadErrorEvent.postValue("网络错误: ${e.message}")
-//            }
+
+
+
             throw e
         }
     }

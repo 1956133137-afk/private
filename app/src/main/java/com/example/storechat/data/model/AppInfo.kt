@@ -2,25 +2,23 @@ package com.example.storechat.data.model
 
 import com.google.gson.annotations.SerializedName
 
-/**
- * 代表应用商店中的单个应用信息
- */
+
 data class AppInfo(
     @SerializedName("productName")
-    val productName: String?, // 改为可空，增加健壮性
+    val productName: String?,
 
     @SerializedName("appId")
-    val appId: String, // appId通常是必需的，保持非空
+    val appId: String,
 
     @SerializedName("appCategory")
-    val appCategory: Int?, // 改为可空
+    val appCategory: Int?,
 
     @SerializedName("createTime")
-    val createTime: String?, // 改为可空
+    val createTime: String?,
 
     @SerializedName("updateTime")
-    val updateTime: String?, // 本身就是可空
+    val updateTime: String?,
 
     @SerializedName("remark")
-    val remark: String? // 本身就是可空
+    val remark: String?
 )

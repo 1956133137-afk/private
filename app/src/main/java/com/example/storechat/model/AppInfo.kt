@@ -33,8 +33,8 @@ data class AppInfo(
     val currentSizeStr: String = "",
     val totalSizeStr: String = "",
 
-    // 【核心修复】新增：保存设备当前实际安装的版本号
-    // 用于在详情页与历史版本的 versionCode 进行比对，判断该历史版本是否就是当前已安装版本
+
+
     val installedVersionCode: Long = 0
 ) : Serializable {
 

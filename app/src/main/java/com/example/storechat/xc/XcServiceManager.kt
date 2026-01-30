@@ -16,34 +16,25 @@ import okhttp3.Response
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * XcServiceManager - 静默安装管理器 (修复版)
- * 修复内容：
- * 1. [关键] init() 中增加了 bindAIDLService 调用，解决 API 无效的问题。
- * 2. 针对降级安装，采用“死磕卸载”策略，确保先卸载再安装。
- * 3. 移除了不存在的 execSuCmd，使用 execRootCmd 兜底。
- */
+
 object XcServiceManager {
     private const val TAG = "XcServiceManager"
-    private var mXCService: MyService? = null  // 向成主板服务
-    private var mXHService: MyManager? = null  // 芯伙主板服务
-    private var boardType = 0 // 0: uninitialized, 1: XC, 2: XH
+    private var mXCService: MyService? = null
+    private var mXHService: MyManager? = null
+    private var boardType = 0
     private lateinit var appContext: Context
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private var isInitialized = false
     private val initLock = Object()
 
-    /**
-     * 初始化服务管理器
-     * 尝试初始化所有可用的硬件服务
-     */
+
     fun init(context: Context) {
         synchronized(initLock) {
             if (isInitialized) return
             appContext = context.applicationContext
             try {
-                // 尝试初始化向成服务
+
                 try {
                     mXCService = MyService(appContext)
                     LogUtil.i(TAG, "XC 服务 (MyService) 已初始化")
@@ -51,17 +42,17 @@ object XcServiceManager {
                     LogUtil.w(TAG, "XC 服务初始化失败: ${e.message}")
                 }
 
-                // 尝试初始化芯伙服务
+
                 try {
                     mXHService = MyManager.getInstance(appContext)
-                    // 【关键修复】根据文档 Page 9，必须调用 bindAIDLService
+    
                     mXHService?.bindAIDLService(appContext)
                     LogUtil.i(TAG, "XH 服务 (MyManager) 已初始化并绑定 AIDL")
                 } catch (e: Throwable) {
                     LogUtil.w(TAG, "XH 服务初始化失败: ${e.message}")
                 }
 
-                // 根据设备型号设置首选主板类型
+
                 boardType = when (Build.MODEL.trim()) {
                     "rk3576_u","QUAD-CORE A133 c3" -> 2
                     else -> 1
@@ -112,7 +103,7 @@ object XcServiceManager {
         waitForInitialization()
 
         try {
-            // 1. 下载APK文件
+
             val file = downloadApkWithResume(appId, versionId, url, onProgress) ?: return@withContext null
 
             val pm = appContext.packageManager
@@ -124,7 +115,7 @@ object XcServiceManager {
                 return@withContext null
             }
 
-            // 读取 APK 实际版本号
+
             val realVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 info.longVersionCode.toInt()
             } else {
@@ -136,18 +127,18 @@ object XcServiceManager {
 
             var isInstallSuccessful = false
 
-            // 方法 1: 使用首选静默安装服务
+
             LogUtil.i(TAG, "第一种方式: Preferred silent install (Type $boardType)")
             isInstallSuccessful = trySilentInstall(pm, file, realPackageName, realVersionCode, boardType)
 
-            // 方法 2: 如果首选失败...
+
             if (!isInstallSuccessful) {
                 val altType = if (boardType == 1) 2 else 1
                 LogUtil.i(TAG, "方法 1 失败, 第二种方式: 替代静默安装 (类型 $altType)")
                 isInstallSuccessful = trySilentInstall(pm, file, realPackageName, realVersionCode, altType)
             }
 
-            // 方法 3: 标准安装
+
             if (!isInstallSuccessful) {
                 LogUtil.i(TAG, "静默安装失败, 第三种方式: 标准安装")
                 isInstallSuccessful = tryStandardInstall(file, realPackageName)
@@ -183,7 +174,7 @@ object XcServiceManager {
 
             val currentVersion = getInstalledVersionCode(pm, realPackageName)
 
-            // 0. 版本一致且应用存在，直接成功
+
             if (currentVersion == newVersionCode) {
                 LogUtil.i(TAG, "版本一致 ($currentVersion)，跳过安装")
                 return true
@@ -194,11 +185,9 @@ object XcServiceManager {
                 LogUtil.w(TAG, "检测到降级 ($currentVersion -> $newVersionCode)，准备强制卸载")
             }
 
-            // -----------------------------------------------------------
-            // 1. 卸载阶段 (死磕模式：绑定服务后 unInstallApk 应该生效了)
-            // -----------------------------------------------------------
+
             if (isAppInstalled(pm, realPackageName)) {
-                // 降级时给 15秒，普通更新给 5秒
+    
                 val maxRetry = if (isDowngrade) 15 else 5
 
                 for (i in 0 until maxRetry) {
@@ -207,63 +196,48 @@ object XcServiceManager {
                         break
                     }
 
-                    // 每 3秒 执行一次卸载指令
+        
                     if (i == 0 || i % 3 == 0) {
                         LogUtil.i(TAG, "执行卸载指令... ($i/$maxRetry)")
                         try {
                             when (type) {
                                 1 -> mXCService?.silentUnInstallApk(realPackageName)
                                 2 -> {
-                                    // 【核心】绑定服务后，unInstallApk 应该能返回 true
-                                    // 如果 jar 包版本支持，此处应该不再是瓶颈
                                     val sdkResult = mXHService?.unInstallApk(realPackageName) ?: false
 
-                                    // 如果 SDK 依然不行，使用 Root 命令兜底
                                     if (!sdkResult) {
-//                                        execRootCmd("pm uninstall $realPackageName")
+
                                     }
                                 }
                             }
                         } catch (e: Exception) {
-//                            execRootCmd("pm uninstall $realPackageName")
+
                         }
                     }
                     delay(1000)
                 }
             }
 
-            // 再次检查卸载结果
-//            if (isDowngrade && isAppInstalled(pm, realPackageName)) {
-//                LogUtil.e(TAG, "【警告】卸载未完成，尝试使用降级参数 (-d) 强行覆盖")
-//                execRootCmd("pm install -r -d ${file.absolutePath}")
-//            }
-
-            // -----------------------------------------------------------
-            // 2. 安装阶段
-            // -----------------------------------------------------------
             LogUtil.i(TAG, "执行安装命令 (类型 $type)")
 
             when (type) {
                 1 -> mXCService?.silentInstallApk(file.absolutePath, realPackageName, false)
                 2 -> {
-                    // 绑定服务后，silentInstallApk 应该能正常工作
+        
                     mXHService?.silentInstallApk(file.absolutePath, false)
 
-//                    if (isDowngrade) {
-//                        execRootCmd("pm install -r -d ${file.absolutePath}")
-//                    }
+
+
+
                 }
             }
 
-            // -----------------------------------------------------------
-            // 3. 结果校验
-            // -----------------------------------------------------------
             for (i in 0..64) {
                 delay(1000)
                 val installedVer = getInstalledVersionCode(pm, realPackageName)
 
 
-                // 每5秒打印一次安装状态
+    
                 if (i % 5 == 0) {
                     LogUtil.i(TAG, "检查安装状态 ($i/65): 当前版本=$installedVer, 目标版本=$newVersionCode")
                 }
@@ -273,11 +247,6 @@ object XcServiceManager {
                     return true
                 }
 
-                // 补救措施
-//                if (type == 2 && i > 0 && i % 5 == 0 && installedVer != newVersionCode) {
-//                    LogUtil.w(TAG, "安装未生效，重试 Root 命令...")
-////                    execRootCmd("pm install -r -d ${file.absolutePath}")
-//                }
             }
 
         } catch (e: Exception) {
@@ -286,21 +255,7 @@ object XcServiceManager {
         return false
     }
 
-//    /**
-//     * 通用 Shell 命令执行器
-//     */
-//    private fun execRootCmd(cmd: String) {
-//        try {
-//            // 尝试以 Root 身份执行
-//            Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
-//        } catch (e: Exception) {
-//            try {
-//                Runtime.getRuntime().exec(cmd)
-//            } catch (e2: Exception) {
-//                LogUtil.e(TAG, "Shell命令执行失败: $cmd")
-//            }
-//        }
-//    }
+
 
 
     private suspend fun tryStandardInstall(apkFile: File, packageName: String): Boolean = withContext(Dispatchers.IO) {

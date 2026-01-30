@@ -6,10 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 
 object AppUtils {
-    /**
-     * 获取已安装应用的版本号
-     * 返回 -1 表示未安装
-     */
+
     fun getInstalledVersionCode(context: Context, packageName: String): Long {
         if (packageName.isBlank()) return -1L
         return try {
@@ -25,9 +22,7 @@ object AppUtils {
         }
     }
 
-    /**
-     * 获取当前应用的版本名称
-     */
+
     fun getAppVersionName(context: Context): String {
         return try {
             val pInfo: PackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -37,9 +32,7 @@ object AppUtils {
         }
     }
 
-    /**
-     * 获取当前应用的版本号
-     */
+
     fun getAppVersionCode(context: Context): Long {
         return try {
             val pInfo: PackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -54,12 +47,7 @@ object AppUtils {
         }
     }
 
-    /**
-     * 打开已安装的应用
-     * @param context 上下文
-     * @param packageName 应用包名
-     * @return 是否成功打开应用
-     */
+
     fun launchApp(context: Context, packageName: String): Boolean {
         return try {
             val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)

@@ -19,7 +19,7 @@ object ApiClient {
         HttpLoggingInterceptor(object : HttpLoggingInterceptor.Logger {
             override fun log(message: String) {
                 Log.i(TAG, message)
-                // 同时写入文件日志
+
                 com.example.storechat.util.LogUtil.i(TAG, message)
             }
         }).apply {
@@ -42,7 +42,7 @@ object ApiClient {
             .addInterceptor(SignInterceptor())
             .addInterceptor(loggingInterceptor)
 
-            //  总超时（防止某些请求挂住很久）
+
             .callTimeout(40, TimeUnit.SECONDS)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)

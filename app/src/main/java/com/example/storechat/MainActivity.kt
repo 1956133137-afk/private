@@ -16,7 +16,7 @@ import com.example.storechat.util.LogUtil
 import com.example.storechat.xc.XcServiceManager
 import me.jessyan.autosize.internal.CustomAdapt
 
-class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
+class MainActivity : AppCompatActivity(), CustomAdapt {
 
     private var drawerLayout: DrawerLayout? = null
 
@@ -39,10 +39,10 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
                 .commit()
         }
 
-        // 检查启动 Intent，看是否需要打开抽屉
+
         handleIntent(intent)
 
-        // 全局监听服务器错误事件
+
         observeDownloadErrors()
         observeEventMessages()
     }
@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
                     .setCancelable(false)
                     .show()
 
-                // 动态设置对话框宽度
+
                 if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
                     val displayMetrics = resources.displayMetrics
                     val width = (displayMetrics.widthPixels * 0.85).toInt()
@@ -82,7 +82,7 @@ class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // 当 Activity 已在后台时，处理新的 Intent
+
         handleIntent(intent)
     }
 

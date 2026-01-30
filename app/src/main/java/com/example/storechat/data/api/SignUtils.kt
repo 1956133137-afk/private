@@ -4,19 +4,13 @@ import java.security.SecureRandom
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * 与签名相关的工具方法
- */
+
 object SignUtils {
 
-    /**
-     * 毫秒级时间戳（13 位）
-     */
+
     fun generateTimestampMillis(): String = System.currentTimeMillis().toString()
 
-    /**
-     * 生成随机 nonce
-     */
+
     fun generateNonce(length: Int = 32): String {
         val chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         val random = SecureRandom()

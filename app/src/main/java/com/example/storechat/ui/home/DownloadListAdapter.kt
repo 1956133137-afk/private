@@ -47,14 +47,12 @@ class DownloadListAdapter(
         private var currentTask: DownloadTask? = null
 
         init {
-            // 点击按钮 暂停/继续
             binding.tvStatus.setOnClickListener {
-                // 【修改】增加状态检查，避免在验证/安装中点击，防止重复操作
                 if (currentTask?.statusButtonEnabled == true) {
                     currentTask?.let(onStatusClick)
                 }
             }
-            // 取消下载
+
             binding.ivCancel.setOnClickListener {
                 currentTask?.let(onCancelClick)
             }
@@ -71,31 +69,30 @@ class DownloadListAdapter(
                 else -> R.drawable.bg_download_status_progress
             }
 
-            // 【关键修复】必须先设置 progressDrawable，再设置 progress
-            // 否则在部分系统/列表复用时，进度条颜色更新会有延迟或错乱
+
+
             binding.statusProgress.progressDrawable = ContextCompat.getDrawable(ctx, drawableRes)
             binding.statusProgress.progress = task.progress
 
-            // 只有下载中/暂停才显示进度条颜色填充，NONE(安装)/VERIFYING(验证)只显示边框
-            // 2. 设置进度条可见性 (保持你原有的逻辑)
+
+
             binding.statusProgress.visibility = when (task.status) {
                 DownloadStatus.DOWNLOADING,
                 DownloadStatus.PAUSED -> View.VISIBLE
                 else -> View.INVISIBLE
             }
             binding.executePendingBindings()
-            // 假设 binding.tvStatus 是那个显示状态/进度的按钮
+
             if (task.status == DownloadStatus.DOWNLOADING) {
                 if (task.progress >= 100) {
                     binding.tvStatus.text = "安装中"
                     binding.tvStatus.isEnabled = false
                 } else {
-//                    binding.tvStatus.text = "${task.progress}%" // 或者保持 xml 定义的格式
                     binding.tvStatus.isEnabled = true
                 }
             }
 
-//            binding.executePendingBindings()
+
         }
     }
 }

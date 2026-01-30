@@ -43,17 +43,17 @@ object AppPackageNameCache {
         if (!isInitialized) init(context)
         try {
             val pm = context.packageManager
-            // 依赖 Manifest 中的 QUERY_ALL_PACKAGES 权限，否则此处仅返回少量系统应用
+
             val packages = pm.getInstalledPackages(0)
             val nameEditor = namePrefs.edit()
 
             for (info in packages) {
-                // 【修复】增加空安全检查，防止崩溃
+    
                 val appInfo = info.applicationInfo ?: continue
                 val label = appInfo.loadLabel(pm).toString()
 
                 if (label.isNotBlank()) {
-                    // 仅当缓存不存在时写入，建立 "应用名" -> "包名" 的关联
+        
                     if (!namePrefs.contains(label)) {
                         nameEditor.putString(label, info.packageName)
                     }

@@ -15,8 +15,8 @@ data class DownloadEntity(
     val categoryId: Int,
 
     val downloadUrl: String,
-    val savePath: String, // 文件存储路径
+    val savePath: String,
     val progress: Int,
-    val status: Int,      // DownloadStatus 的 ordinal
+    val status: Int,
     val createTime: Long = System.currentTimeMillis()
 )
